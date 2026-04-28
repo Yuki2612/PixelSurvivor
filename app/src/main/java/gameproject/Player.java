@@ -2,26 +2,29 @@ package gameproject;
 
 import java.awt.Color;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.event.KeyEvent;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
+import gameproject.skill.Upgrade;
+import gameproject.meta.CharacterClass;
 
 public class Player {
     private float x, y;
-    private final int SIZE = 40;
+    private final int SIZE = 25;
 
     private float speed = 5.0f;
     private long dashCooldown = 2000;
 
-    // Hệ thống HP
     private int hearts = 3;
-    private final int MAX_HEARTS = 10;
+    private final int MAX_HEARTS = 15;
     private long invulnerableUntil = 0;
 
-    private Map<Upgrade, Integer> breakthroughLevels = new HashMap<>();
+    // GOM CHUNG TOÀN BỘ NÂNG CẤP VÀO ĐÂY ĐỂ ĐẾM LEVEL
+    private Map<Upgrade, Integer> upgradeLevels = new HashMap<>();
 
     private boolean up, down, left, right;
     private float lastDirX = 1, lastDirY = 0;
@@ -32,13 +35,15 @@ public class Player {
     private final long DASH_DURATION = 150;
     private final float DASH_SPEED = 18.0f;
 
-    public Player(float startX, float startY) {
+    public Player(float startX, float startY, CharacterClass charClass) {
         this.x = startX;
         this.y = startY;
+        this.dashCooldown = (long)(2000 * (1.0f - gameproject.meta.PlayerData.statDashLevel * 0.02f));
         this.lastDashTime = -dashCooldown;
+        this.hearts = charClass.baseHp + (gameproject.meta.PlayerData.statHealthLevel / 10);
+        this.speed = (5.0f * charClass.speedMulti) * (1.0f + gameproject.meta.PlayerData.statSpeedLevel * 0.02f);
     }
 
-    // UPDATE ĐÃ NHẬN THÊM KÍCH THƯỚC MÀN HÌNH ĐỂ CHẶN BIÊN ĐỘNG
     public void update(int screenWidth, int screenHeight) {
         if (isDashing) {
             if (System.currentTimeMillis() - dashStartTime >= DASH_DURATION) {
@@ -83,11 +88,26 @@ public class Player {
         if (isInvulnerable() && System.currentTimeMillis() % 200 < 100)
             return;
 
-        if (isDashing)
-            g.setColor(Color.CYAN);
-        else
-            g.setColor(Color.RED);
-        g.fillRect((int) x, (int) y, SIZE, SIZE);
+        java.awt.image.BufferedImage img = ImageManager.get("player");
+        if (img != null) {
+            int drawX = (int) x - 10;
+            int drawY = (int) y - 20;
+            int drawSize = SIZE + 20;
+            if (isDashing) {
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, 0.5f));
+                g2d.drawImage(img, drawX, drawY, drawSize, drawSize, null);
+                g2d.dispose();
+            } else {
+                g.drawImage(img, drawX, drawY, drawSize, drawSize, null);
+            }
+        } else {
+            if (isDashing)
+                g.setColor(Color.CYAN);
+            else
+                g.setColor(Color.RED);
+            g.fillRect((int) x, (int) y, SIZE, SIZE);
+        }
     }
 
     public void keyPressed(KeyEvent e) {
@@ -147,22 +167,38 @@ public class Player {
     public boolean takeHit() {
         if (isInvulnerable())
             return false;
-
         hearts--;
         invulnerableUntil = System.currentTimeMillis() + 1000;
         return hearts <= 0;
     }
 
+    // LÕI XỬ LÝ LEVEL CỦA TẤT CẢ NÂNG CẤP (MAX LEVEL = 10)
+    public void levelUpUpgrade(Upgrade u) {
+        int current = upgradeLevels.getOrDefault(u, 0);
+        if (current < 10)
+            upgradeLevels.put(u, current + 1);
+    }
+
+    public int getUpgradeLevel(Upgrade u) {
+        return upgradeLevels.getOrDefault(u, 0);
+    }
+
+    // Giữ nguyên hàm này để tránh báo lỗi các Kỹ năng cũ
     public void levelUpBreakthrough(Upgrade u) {
-        breakthroughLevels.put(u, breakthroughLevels.getOrDefault(u, 0) + 1);
+        levelUpUpgrade(u);
     }
 
     public int getBreakthroughLevel(Upgrade u) {
-        return breakthroughLevels.getOrDefault(u, 0);
+        return getUpgradeLevel(u);
     }
 
     public List<Upgrade> getOwnedBreakthroughs() {
-        return new ArrayList<>(breakthroughLevels.keySet());
+        List<Upgrade> list = new ArrayList<>();
+        for (Upgrade u : upgradeLevels.keySet()) {
+            if (u.isBreakthrough)
+                list.add(u);
+        }
+        return list;
     }
 
     public boolean isInvulnerable() {
