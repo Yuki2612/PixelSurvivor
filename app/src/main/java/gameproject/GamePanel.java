@@ -24,6 +24,11 @@ public class GamePanel extends JPanel implements Runnable {
     public int screenWidth = (int) java.awt.Toolkit.getDefaultToolkit().getScreenSize().getWidth();
     public int screenHeight = (int) java.awt.Toolkit.getDefaultToolkit().getScreenSize().getHeight();
 
+    public static final int WORLD_WIDTH = 1800;
+    public static final int WORLD_HEIGHT = 1800;
+    
+    public float cameraX, cameraY;
+
     public InputManager input;
     public UpgradeManager upgradeManager;
     public EntityManager entityManager;

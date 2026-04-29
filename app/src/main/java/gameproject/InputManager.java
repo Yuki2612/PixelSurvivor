@@ -14,6 +14,7 @@ public class InputManager implements KeyListener, MouseListener, MouseMotionList
     public boolean mouseClicked = false;
     public boolean escPressed = false;
     public boolean rPressed = false;
+    public String typedKeySequence = "";
 
     private GamePanel game;
 
@@ -74,7 +75,12 @@ public class InputManager implements KeyListener, MouseListener, MouseMotionList
         mouseY = e.getY();
     }
 
-    @Override public void keyTyped(KeyEvent e) {}
+    @Override public void keyTyped(KeyEvent e) {
+        typedKeySequence += e.getKeyChar();
+        if (typedKeySequence.length() > 20) {
+            typedKeySequence = typedKeySequence.substring(typedKeySequence.length() - 20);
+        }
+    }
     @Override public void mouseClicked(MouseEvent e) {}
     @Override public void mouseEntered(MouseEvent e) {}
     @Override public void mouseExited(MouseEvent e) {}

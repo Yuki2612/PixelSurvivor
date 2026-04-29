@@ -2,13 +2,16 @@ package gameproject.ui;
 
 import java.awt.Color;
 import java.awt.Graphics;
+import java.util.ArrayList;
 import gameproject.FontManager;
 import gameproject.ImageManager;
 import gameproject.Player;
+import gameproject.entity.Enemy;
 
 public class HUD {
     public static void draw(Graphics g, int screenWidth, int screenHeight, int score, int waveCount,
-            int playerDamage, long fireRate, Player player, int currentExp, int expToNextLevel, int playerLevel) {
+            int playerDamage, long fireRate, Player player, int currentExp, int expToNextLevel, int playerLevel,
+            ArrayList<Enemy> enemies) {
         
         g.setFont(FontManager.getFont(20f));
 
@@ -85,5 +88,70 @@ public class HUD {
         g.drawString(expText, screenWidth / 2 - 140 + 2, barY + 20 + 2);
         g.setColor(Color.WHITE);
         g.drawString(expText, screenWidth / 2 - 140, barY + 20);
+
+        // Boss HP bar (ở giữa cạnh trên màn hình)
+        for (Enemy e : enemies) {
+            if (e.isBoss && !e.isDying) {
+                int bBarW = 500;
+                int bBarH = 22;
+                int bBarX = screenWidth / 2 - bBarW / 2;
+                int bBarY = 16;
+
+                g.setColor(new Color(0, 0, 0, 160));
+                g.fillRoundRect(bBarX - 4, bBarY - 4, bBarW + 8, bBarH + 8, 8, 8);
+                g.setColor(new Color(100, 0, 0));
+                g.fillRoundRect(bBarX, bBarY, bBarW, bBarH, 6, 6);
+                int hpW = (int)((float) e.getHp() / e.getMaxHp() * bBarW);
+                if (hpW > 0) {
+                    g.setColor(new Color(220, 50, 50));
+                    g.fillRoundRect(bBarX, bBarY, hpW, bBarH, 6, 6);
+                }
+                g.setColor(Color.WHITE);
+                g.drawRoundRect(bBarX, bBarY, bBarW, bBarH, 6, 6);
+
+                g.setFont(FontManager.getFont(14f));
+                String bossLabel = "BOSS  " + Math.max(0, e.getHp()) + " / " + e.getMaxHp();
+                int labelW = g.getFontMetrics().stringWidth(bossLabel);
+                g.setColor(Color.BLACK);
+                g.drawString(bossLabel, screenWidth / 2 - labelW / 2 + 1, bBarY + 16);
+                g.setColor(Color.WHITE);
+                g.drawString(bossLabel, screenWidth / 2 - labelW / 2, bBarY + 15);
+                break;
+            }
+        }
+        drawMinimap(g, screenWidth, player, enemies);
+    }
+
+    private static void drawMinimap(Graphics g, int screenWidth, Player player, ArrayList<Enemy> enemies) {
+        int mapSize = 150;
+        int padding = 20;
+        int mapX = screenWidth - mapSize - padding;
+        int mapY = 20;
+
+        // Vẽ nền minimap
+        g.setColor(new Color(0, 0, 0, 150)); // Đen bán trong suốt
+        g.fillRect(mapX, mapY, mapSize, mapSize);
+        g.setColor(Color.WHITE);
+        g.drawRect(mapX, mapY, mapSize, mapSize);
+
+        float scaleX = (float) mapSize / gameproject.GamePanel.WORLD_WIDTH;
+        float scaleY = (float) mapSize / gameproject.GamePanel.WORLD_HEIGHT;
+
+        // Vẽ quái (chấm đỏ)
+        g.setColor(Color.RED);
+        for (Enemy e : enemies) {
+            if (e.isDead()) continue;
+            int ex = mapX + (int) (e.getX() * scaleX);
+            int ey = mapY + (int) (e.getY() * scaleY);
+            // Kích thước chấm: 3x3 cho boss, 2x2 cho quái thường
+            int dotSize = e.isBoss ? 4 : 2;
+            g.fillRect(ex, ey, dotSize, dotSize);
+        }
+
+        // Vẽ người chơi (chấm trắng)
+        g.setColor(Color.WHITE);
+        int px = mapX + (int) (player.getX() * scaleX);
+        int py = mapY + (int) (player.getY() * scaleY);
+        g.fillRect(px - 1, py - 1, 4, 4);
     }
 }

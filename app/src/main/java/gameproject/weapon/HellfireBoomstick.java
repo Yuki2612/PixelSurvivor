@@ -5,7 +5,7 @@ import java.util.ArrayList;
 
 public class HellfireBoomstick extends Weapon {
     public HellfireBoomstick() {
-        super("Hellfire", 0.75f, 600, false, 350f);
+        super("Hellfire", 0.85f, 600, false, 300f);
     }
 
     @Override

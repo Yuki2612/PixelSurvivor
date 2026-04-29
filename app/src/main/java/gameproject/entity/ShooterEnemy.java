@@ -67,18 +67,13 @@ public class ShooterEnemy extends Enemy {
         float currentSpeed = speed * speedMultiplier;
         float moveX = 0, moveY = 0;
 
-        if (distance < 400 && distance > 0) { // Tầm nhìn xa hơn quái thường
+        if (distance < 800 && distance > 0) { // Tầm nhìn xa hơn quái thường
             moveX = (dx / distance) * currentSpeed;
             moveY = (dy / distance) * currentSpeed;
         } else {
-            if (wanderTimer <= 0) {
-                wanderX = rand.nextFloat() * 2 - 1;
-                wanderY = rand.nextFloat() * 2 - 1;
-                wanderTimer = 60 + rand.nextInt(60);
-            }
-            moveX = wanderX * (currentSpeed * 0.5f);
-            moveY = wanderY * (currentSpeed * 0.5f);
-            wanderTimer--;
+            // Đi về phía player chậm rãi khi ngoài tầm nhìn
+            moveX = (dx / distance) * (currentSpeed * 0.4f);
+            moveY = (dy / distance) * (currentSpeed * 0.4f);
         }
 
         for (Enemy other : allEnemies) {
@@ -107,7 +102,7 @@ public class ShooterEnemy extends Enemy {
         if (canShoot) {
             canShoot = false;
             float bulletSpeed = 0.4f + (tier * 0.05f); // Đạn nhanh dần theo tier
-            Projectile p = new Projectile(x, y, targetPX, targetPY, bulletSpeed, 500f);
+            Projectile p = new Projectile(x, y, targetPX, targetPY, bulletSpeed, 800f);
             p.isEnemyBullet = true;
             p.damage = 1;
             return p;

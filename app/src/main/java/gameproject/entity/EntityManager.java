@@ -45,22 +45,22 @@ public class EntityManager {
             waveCount++;
             int waveSize = 2 + waveCount;
             for (int i = 0; i < waveSize; i++) {
-                enemies.add(spawnSafeEnemy(player, screenWidth, screenHeight, surviveTimeSeconds));
+                enemies.add(spawnSafeEnemy(player, panel, surviveTimeSeconds));
             }
 
             if (waveCount % 5 == 0) {
                 int bType = (waveCount / 5) % 3;
-                if (bType == 0)
-                    bType = 3;
-                float bossStartX = screenWidth / 2f;
-                float bossStartY = 50f;
+                if (bType == 0) bType = 3;
+                float bossStartX = panel.cameraX + screenWidth / 2f;
+                float bossStartY = panel.cameraY - 100f; // Boss tới từ phía trên camera
 
-                if (bType == 1)
-                    enemies.add(new ChargerBoss(bossStartX, bossStartY, surviveTimeSeconds));
-                else if (bType == 2)
-                    enemies.add(new TeleporterBoss(bossStartX, bossStartY, surviveTimeSeconds));
-                else
-                    enemies.add(new TankBoss(bossStartX, bossStartY, surviveTimeSeconds));
+                if (bType == 1)      enemies.add(new ChargerBoss(bossStartX, bossStartY, surviveTimeSeconds));
+                else if (bType == 2) enemies.add(new TeleporterBoss(bossStartX, bossStartY, surviveTimeSeconds));
+                else                 enemies.add(new TankBoss(bossStartX, bossStartY, surviveTimeSeconds));
+
+                vfxManager.showWaveBanner("⚠  BOSS INCOMING!", new java.awt.Color(255, 80, 80), currentTime);
+            } else {
+                vfxManager.showWaveBanner("Wave " + waveCount, new java.awt.Color(255, 220, 80), currentTime);
             }
 
             lastEnemySpawnTime = currentTime;
@@ -77,7 +77,7 @@ public class EntityManager {
         Iterator<Projectile> pIt = projectiles.iterator();
         while (pIt.hasNext()) {
             Projectile p = pIt.next();
-            p.update(screenWidth, screenHeight);
+            p.update(GamePanel.WORLD_WIDTH, GamePanel.WORLD_HEIGHT);
 
             // Kiểm tra đạn nổ của địch khi hết tầm bay
             if (!p.isActive() && p.isEnemyBullet && p.isExplosive) {
@@ -128,7 +128,11 @@ public class EntityManager {
                         
                         for (Enemy e : enemies) {
                             if (!e.isDead() && distanceToLineSegment(e.getX() + e.size/2, e.getY() + e.size/2, p.startX, p.startY, endX, endY) <= 40) {
-                                e.takeDamage(p.damage, vfxManager, currentTime);
+                                // Khi crit: bỏ qua white text (null vfxManager), chỉ hiện gold text
+                                e.takeDamage(p.damage, p.isCrit ? null : vfxManager, currentTime);
+                                if (p.isCrit) {
+                                    vfxManager.addCritDamageText(e.getX() + 15, e.getY() - 10, p.damage, currentTime);
+                                }
                             }
                         }
                     }
@@ -137,7 +141,11 @@ public class EntityManager {
                 } else {
                     for (Enemy e : enemies) {
                         if (e != p.ignoredEnemy && p.getBounds().intersects(e.getBounds())) {
-                            e.takeDamage(p.damage, vfxManager, currentTime);
+                            // Khi crit: bỏ qua white text (null vfxManager), chỉ hiện gold text
+                            e.takeDamage(p.damage, p.isCrit ? null : vfxManager, currentTime);
+                            if (p.isCrit) {
+                                vfxManager.addCritDamageText(e.getX() + 15, e.getY() - 10, p.damage, currentTime);
+                            }
                             if (p.isShocking) {
                                 e.applyShock(1000, vfxManager, enemies);
                             }
@@ -179,6 +187,43 @@ public class EntityManager {
         Iterator<Enemy> eIt = enemies.iterator();
         while (eIt.hasNext()) {
             Enemy enemy = eIt.next();
+
+            // Qu\u00e1i \u0111ang trong death fade \u2014 b\u1ecf qua to\u00e0n b\u1ed9 logic, ch\u1ec9 ch\u1edd shouldRemove()
+            if (enemy.isDying) {
+                if (enemy.shouldRemove()) {
+                    panel.addScoreAndExp(enemy.getMaxHp());
+                    SoundManager.play("hit");
+                    vfxManager.spawnDeathParticles(enemy.getX() + enemy.size / 2f,
+                            enemy.getY() + enemy.size / 2f, currentTime,
+                            enemy.isBoss ? new java.awt.Color(255, 80, 80) : enemy.color);
+
+                    if (enemy.isBoss && !hasDroppedWeapon) {
+                        weaponChest = new Rectangle((int) enemy.getX(), (int) enemy.getY(), 40, 40);
+                        hasDroppedWeapon = true;
+                    }
+                    if (enemy.isBoss) {
+                        PlayerData.gold += 50;
+                        PlayerData.soulStones += 1;
+                    } else {
+                        if (Math.random() < 0.2) PlayerData.gold += 1;
+                    }
+                    if (enemy.triggerCorrosiveMelt) {
+                        vfxManager.addAcidZone(enemy.getX(), enemy.getY(), 80, currentTime);
+                    }
+                    if (!enemy.isBoss && Math.random() < 0.02) {
+                        heartDrops.add(new HeartDrop(enemy.getX(), enemy.getY(), currentTime + 10000));
+                    } else if (enemy.isBoss) {
+                        heartDrops.add(new HeartDrop(enemy.getX(), enemy.getY(), currentTime + 20000));
+                        heartDrops.add(new HeartDrop(enemy.getX() + 30, enemy.getY(), currentTime + 20000));
+                    }
+                    for (PassiveSkill skill : activeSkills) {
+                        skill.onEnemyDeath(enemy, player, enemies, vfxManager, currentTime);
+                    }
+                    eIt.remove();
+                }
+                continue; // B\u1ecf qua m\u1ecdi logic c\u00f2n l\u1ea1i trong v\u00f2ng l\u1eb7p
+            }
+
             float currentEnemySpeedMulti = speedMultiplier;
             if (enemy.chillEndTime > currentTime) currentEnemySpeedMulti *= 0.7f;
             if (enemy.inAcidZone) currentEnemySpeedMulti *= 0.5f;
@@ -186,63 +231,31 @@ public class EntityManager {
             enemy.playerDamageCache = panel.upgradeManager.playerDamage;
             enemy.updateStatusEffects(currentTime, vfxManager);
             enemy.inAcidZone = false;
-            
+
             if (enemy.freezeEndTime <= currentTime) {
-                enemy.update(player.getX(), player.getY(), currentEnemySpeedMulti, enemies, screenWidth, screenHeight);
+                enemy.update(player.getX(), player.getY(), currentEnemySpeedMulti, enemies, GamePanel.WORLD_WIDTH, GamePanel.WORLD_HEIGHT);
             }
 
-            // Gom đạn do quái bắn ra (nếu có)
+            // Gom \u0111\u1ea1n do qu\u00e1i b\u1eafn ra (n\u1ebfu c\u00f3)
             Projectile enemyProj = enemy.shoot();
             if (enemyProj != null) {
                 newEnemyProjectiles.add(enemyProj);
             }
 
             // Quái va chạm trực tiếp với Player
-            if (!player.isDashing() && !player.isInvulnerable() && player.getBounds().intersects(enemy.getBounds())) {
+            if (!player.isDashing() && !player.isInvulnerable() && player.getBounds().intersects(enemy.getBounds()) && !enemy.isDying) {
                 if (player.takeHit()) {
                     panel.triggerGameOver();
                 } else {
                     vfxManager.triggerScreenShake(15);
+                    vfxManager.triggerPlayerDamageFlash(currentTime);
                     for (Enemy e : enemies)
                         e.applyKnockback(player.getX(), player.getY(), 40f);
                 }
                 break;
             }
 
-            // Xử lý khi quái chết
-            if (enemy.isDead()) {
-                panel.addScoreAndExp(enemy.getMaxHp());
-                SoundManager.play("hit");
-
-                if (enemy.isBoss && !hasDroppedWeapon) {
-                    weaponChest = new Rectangle((int) enemy.getX(), (int) enemy.getY(), 40, 40);
-                    hasDroppedWeapon = true;
-                }
-
-                if (enemy.isBoss) {
-                    PlayerData.gold += 50;
-                    PlayerData.soulStones += 1;
-                } else {
-                    if (Math.random() < 0.2) PlayerData.gold += 1;
-                }
-                
-                if (enemy.triggerCorrosiveMelt) {
-                    vfxManager.addAcidZone(enemy.getX(), enemy.getY(), 80, currentTime);
-                }
-
-                if (!enemy.isBoss && Math.random() < 0.02) {
-                    heartDrops.add(new HeartDrop(enemy.getX(), enemy.getY(), currentTime + 10000));
-                } else if (enemy.isBoss) {
-                    heartDrops.add(new HeartDrop(enemy.getX(), enemy.getY(), currentTime + 20000));
-                    heartDrops.add(new HeartDrop(enemy.getX() + 30, enemy.getY(), currentTime + 20000));
-                }
-
-                for (PassiveSkill skill : activeSkills) {
-                    skill.onEnemyDeath(enemy, player, enemies, vfxManager, currentTime);
-                }
-
-                eIt.remove();
-            }
+            // isDying qu\u1ea3n l\u00fd \u1edf \u0111\u1ea7u v\u00f2ng l\u1eb7p v\u1edbi continue, n\u00ean kh\u00f4ng c\u1ea7n check th\u00eam \u1edf \u0111\u00e2y
         }
         // Đưa toàn bộ đạn mới của địch vào luồng đạn chính
         projectiles.addAll(newEnemyProjectiles);
@@ -293,17 +306,34 @@ public class EntityManager {
         }
     }
 
-    private Enemy spawnSafeEnemy(Player player, int screenWidth, int screenHeight, int surviveTimeSeconds) {
+    private Enemy spawnSafeEnemy(Player player, GamePanel panel, int surviveTimeSeconds) {
         Random rand = new Random();
-        float ex, ey;
-        while (true) {
-            ex = rand.nextInt(screenWidth - 30);
-            ey = rand.nextInt(screenHeight - 30);
-            float dx = ex - player.getX();
-            float dy = ey - player.getY();
-            if ((float) Math.sqrt(dx * dx + dy * dy) >= 250.0f)
-                break;
+        float ex = 0, ey = 0;
+        
+        float camX = panel.cameraX;
+        float camY = panel.cameraY;
+        int sw = panel.screenWidth;
+        int sh = panel.screenHeight;
+
+        // Spawn ra sát ngoài viền camera
+        int side = rand.nextInt(4);
+        if (side == 0) { // Top
+            ex = camX + rand.nextInt(sw);
+            ey = camY - 50;
+        } else if (side == 1) { // Bottom
+            ex = camX + rand.nextInt(sw);
+            ey = camY + sh + 50;
+        } else if (side == 2) { // Left
+            ex = camX - 50;
+            ey = camY + rand.nextInt(sh);
+        } else { // Right
+            ex = camX + sw + 50;
+            ey = camY + rand.nextInt(sh);
         }
+
+        // Clamp inside WORLD
+        ex = Math.max(0, Math.min(ex, GamePanel.WORLD_WIDTH - 30));
+        ey = Math.max(0, Math.min(ey, GamePanel.WORLD_HEIGHT - 30));
 
         int minTier = Math.min(5, (waveCount / 3) + 1);
         int maxTier = Math.min(5, Math.max(minTier, waveCount));
@@ -348,8 +378,13 @@ public class EntityManager {
         }
 
         for (HeartDrop hd : heartDrops) {
-            g.setColor(Color.PINK);
-            g.fillRect((int) hd.x, (int) hd.y, 15, 15);
+            java.awt.image.BufferedImage heartImg = gameproject.ImageManager.get("heart");
+            if (heartImg != null) {
+                g.drawImage(heartImg, (int) hd.x - 2, (int) hd.y - 2, 20, 20, null);
+            } else {
+                g.setColor(java.awt.Color.PINK);
+                g.fillRect((int) hd.x, (int) hd.y, 15, 15);
+            }
         }
         for (Projectile p : projectiles)
             p.draw(g);

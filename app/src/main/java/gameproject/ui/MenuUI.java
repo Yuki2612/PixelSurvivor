@@ -28,6 +28,9 @@ public class MenuUI {
         g.drawString("SETTINGS", btnX + 15, screenHeight / 2 + 150);
         
         g.drawRect(btnX, screenHeight / 2 + 180, 200, 50);
-        g.drawString("QUIT", btnX + 50, screenHeight / 2 + 220);
+        g.drawString("GUIDE", btnX + 50, screenHeight / 2 + 220);
+
+        g.drawRect(btnX, screenHeight / 2 + 250, 200, 50);
+        g.drawString("QUIT", btnX + 55, screenHeight / 2 + 290);
     }
 }

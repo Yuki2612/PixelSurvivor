@@ -4,10 +4,10 @@ import gameproject.skill.Upgrade;
 
 public enum CharacterClass {
     MERCENARY("Mercenary", 5, 1.0f, 1.0f, null, 0),
-    NINJA("Ninja", 3, 1.3f, 1.2f, Upgrade.DASH_COOLDOWN, 1000),
-    PYROMANCER("Pyromancer", 4, 1.0f, 1.1f, Upgrade.TRAIL_OF_FIRE, 2000),
-    FROST_MAGE("Frost Mage", 4, 0.9f, 1.1f, Upgrade.FROST_AURA, 2000),
-    NECROMANCER("Necromancer", 3, 1.0f, 1.0f, Upgrade.EXPLOSIVE_CORPSE, 5000);
+    NINJA("Ninja", 3, 1.1f, 1.1f, Upgrade.DASH_COOLDOWN, 1000),
+    PYROMANCER("Pyromancer", 4, 1.0f, 1.15f, Upgrade.TRAIL_OF_FIRE, 2000),
+    FROST_MAGE("Frost Mage", 4, 1f, 1.1f, Upgrade.FROST_AURA, 2000),
+    NECROMANCER("Necromancer", 3, 1.2f, 1.0f, Upgrade.EXPLOSIVE_CORPSE, 5000);
 
     public final String name;
     public final int baseHp;
@@ -16,7 +16,8 @@ public enum CharacterClass {
     public final Upgrade startingUpgrade;
     public final int unlockCost;
 
-    CharacterClass(String name, int baseHp, float speedMulti, float damageMulti, Upgrade startingUpgrade, int unlockCost) {
+    CharacterClass(String name, int baseHp, float speedMulti, float damageMulti, Upgrade startingUpgrade,
+            int unlockCost) {
         this.name = name;
         this.baseHp = baseHp;
         this.speedMulti = speedMulti;

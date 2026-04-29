@@ -35,6 +35,8 @@ java {
 application {
     // Define the main class for the application.
     mainClass = 'gameproject.App'
+    // Truyền thư mục làm việc là gốc project để đường dẫn app/res/ hoạt động đúng
+    applicationDefaultJvmArgs = ["-Duser.dir=${rootProject.projectDir}"]
 }
 
 tasks.named('test') {

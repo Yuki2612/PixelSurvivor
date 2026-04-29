@@ -143,7 +143,7 @@ public class UpgradeManager {
                         activeSkills.add(new VampirismSkill());
                     }
                 }
-                case OPTICAL_SCOPE -> currentWeapon.range *= 1.12f;
+                case OPTICAL_SCOPE -> currentWeapon.range *= 1.09f;
                 default -> {
                 }
             }

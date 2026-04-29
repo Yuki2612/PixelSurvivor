@@ -51,8 +51,8 @@ public class Player {
             } else {
                 x += dashDirX * DASH_SPEED;
                 y += dashDirY * DASH_SPEED;
-                x = Math.max(0, Math.min(x, screenWidth - SIZE));
-                y = Math.max(0, Math.min(y, screenHeight - SIZE));
+                x = Math.max(0, Math.min(x, GamePanel.WORLD_WIDTH - SIZE));
+                y = Math.max(0, Math.min(y, GamePanel.WORLD_HEIGHT - SIZE));
             }
         } else {
             boolean isMoving = false;
@@ -62,7 +62,7 @@ public class Player {
                 currentDirY = -1;
                 isMoving = true;
             }
-            if (down && y < screenHeight - SIZE) {
+            if (down && y < GamePanel.WORLD_HEIGHT - SIZE) {
                 y += speed;
                 currentDirY = 1;
                 isMoving = true;
@@ -72,7 +72,7 @@ public class Player {
                 currentDirX = -1;
                 isMoving = true;
             }
-            if (right && x < screenWidth - SIZE) {
+            if (right && x < GamePanel.WORLD_WIDTH - SIZE) {
                 x += speed;
                 currentDirX = 1;
                 isMoving = true;

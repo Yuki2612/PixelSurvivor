@@ -1,10 +1,11 @@
 package gameproject.entity;
 
 import gameproject.*;
-import gameproject.weapon.Projectile; // BẮT BUỘC PHẢI CÓ IMPORT NÀY
+import gameproject.weapon.Projectile;
 
 import java.awt.Color;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.util.ArrayList;
 
@@ -16,7 +17,7 @@ public abstract class Enemy {
     protected Color color;
     protected float kbX = 0, kbY = 0;
     public boolean isBoss = false;
-    
+
     public long burnEndTime = 0;
     public long chillEndTime = 0;
     public long poisonEndTime = 0;
@@ -28,13 +29,19 @@ public abstract class Enemy {
     // Cache chỉ số sát thương của player – được EntityManager cập nhật mỗi frame
     // Dùng để phản ứng nguyên tố scale cùng progression của player
     public int playerDamageCache = 10;
-    
+
     private long lastBurnTick = 0;
     private long lastPlasmaTick = 0;
     public boolean triggerCorrosiveMelt = false;
 
     public long thermalShockCooldown = 0;
     public long plasmaCooldown = 0;
+
+    // ── Phase-1 VFX ──────────────────────────────────────────────
+    private long hitFlashEndTime = 0; // White flash khi nhận damage
+    private long deathFadeStartTime = -1; // -1 = chưa bắt đầu chết
+    public long deathFadeDuration = 300;
+    public boolean isDying = false; // đang trong animation chết
 
     public Enemy(float x, float y, int size, int maxHp, float speed, Color color) {
         this.x = x;
@@ -70,7 +77,7 @@ public abstract class Enemy {
             burnEndTime = 0;
             thermalShockCooldown = System.currentTimeMillis() + 3000;
             // Thermal Shock: 5x playerDamage – combo mạnh, scale cùng player
-            takeDamageBase(playerDamageCache * 5, vfxManager, System.currentTimeMillis(), Color.WHITE);
+            takeDamageBase(playerDamageCache * 3, vfxManager, System.currentTimeMillis(), Color.WHITE);
             freezeEndTime = System.currentTimeMillis() + 1500;
         } else {
             burnEndTime = Math.max(burnEndTime, System.currentTimeMillis() + duration);
@@ -83,7 +90,7 @@ public abstract class Enemy {
             burnEndTime = 0;
             thermalShockCooldown = System.currentTimeMillis() + 3000;
             // Thermal Shock: 5x playerDamage – combo mạnh, scale cùng player
-            takeDamageBase(playerDamageCache * 5, vfxManager, System.currentTimeMillis(), Color.WHITE);
+            takeDamageBase(playerDamageCache * 3, vfxManager, System.currentTimeMillis(), Color.WHITE);
             freezeEndTime = System.currentTimeMillis() + 1500;
         } else {
             chillEndTime = Math.max(chillEndTime, System.currentTimeMillis() + duration);
@@ -142,23 +149,41 @@ public abstract class Enemy {
 
     public void takeDamage(int damage, VFXManager vfxManager, long currentTime) {
         if (poisonEndTime > currentTime) {
-            damage = (int)(damage * 1.3f);
+            damage = (int) (damage * 1.3f);
         }
         takeDamageBase(damage, vfxManager, currentTime, poisonEndTime > currentTime ? Color.GREEN : Color.WHITE);
     }
 
     private void takeDamageBase(int damage, VFXManager vfxManager, long currentTime, Color textColor) {
         this.hp -= damage;
+        hitFlashEndTime = currentTime + 80; // Hit flash 80ms
         if (vfxManager != null) {
             vfxManager.addDamageText(this.x + 15, this.y, damage, currentTime, textColor);
         }
-        if (isDead() && poisonEndTime > currentTime && burnEndTime > currentTime) {
-            triggerCorrosiveMelt = true;
+        if (hp <= 0) {
+            // Kích hoạt death fade animation ngay khi dưới 0 HP lần đầu
+            if (!isDying) {
+                isDying = true;
+                deathFadeStartTime = currentTime;
+            }
+            if (poisonEndTime > currentTime && burnEndTime > currentTime) {
+                triggerCorrosiveMelt = true;
+            }
         }
     }
 
+    /** Kiểm tra quái đã cạn kiệt HP (dùng bởi passive skills, va chạm, etc.) */
     public boolean isDead() {
         return this.hp <= 0;
+    }
+
+    /** Kiểm tra đã xong animation fade và có thể xóa khỏi danh sách */
+    public boolean shouldRemove() {
+        if (hp <= 0 && !isDying) {
+            isDying = true;
+            deathFadeStartTime = System.currentTimeMillis();
+        }
+        return isDying && (System.currentTimeMillis() - deathFadeStartTime >= deathFadeDuration);
     }
 
     public float getX() {
@@ -178,22 +203,51 @@ public abstract class Enemy {
     }
 
     protected void drawSprite(Graphics g, String imageKey) {
+        long now = System.currentTimeMillis();
         java.awt.image.BufferedImage img = ImageManager.get(imageKey);
+        Graphics2D g2d = (Graphics2D) g;
+
+        // Alpha: fade out khi đang chết
+        float alpha = 1.0f;
+        if (isDying && deathFadeStartTime >= 0) {
+            alpha = 1.0f - Math.min(1f, (float) (now - deathFadeStartTime) / deathFadeDuration);
+        }
+        g2d.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, alpha));
+
         if (img != null) {
             int drawX = (int) x - 10;
             int drawY = (int) y - 20;
-            int drawWidth = size + 20;
-            int drawHeight = size + 20;
-            g.drawImage(img, drawX, drawY, drawWidth, drawHeight, null);
+            int drawW = size + 20;
+            int drawH = size + 20;
+            g2d.drawImage(img, drawX, drawY, drawW, drawH, null);
+
+            // Hit flash: vẽ lớp trắng bán trong suốt lên trên sprite
+            if (now < hitFlashEndTime) {
+                float flashAlpha = 0.65f * (float) (hitFlashEndTime - now) / 80f;
+                g2d.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER,
+                        Math.max(0, Math.min(0.65f, flashAlpha))));
+                g2d.setColor(Color.WHITE);
+                g2d.fillRect(drawX, drawY, drawW, drawH);
+            }
         } else {
-            g.setColor(color);
-            g.fillRect((int) x, (int) y, size, size);
+            g2d.setColor(color);
+            g2d.fillRect((int) x, (int) y, size, size);
         }
 
-        g.setColor(Color.RED);
-        g.fillRect((int) x, (int) y + size, size, 4);
-        g.setColor(Color.GREEN);
-        int hpWidth = (int) ((float) hp / maxHp * size);
-        g.fillRect((int) x, (int) y + size, hpWidth, 4);
+        // Reset composite
+        g2d.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, 1f));
+
+        // HP bar (chỉ hiện khi còn sống)
+        if (!isDying) {
+            g.setColor(Color.RED);
+            g.fillRect((int) x, (int) y + size, size, 4);
+            g.setColor(Color.GREEN);
+            int hpWidth = (int) ((float) hp / maxHp * size);
+            g.fillRect((int) x, (int) y + size, hpWidth, 4);
+        }
+    }
+
+    public int getHp() {
+        return hp;
     }
 }

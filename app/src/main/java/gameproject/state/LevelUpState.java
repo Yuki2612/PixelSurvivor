@@ -43,14 +43,14 @@ public class LevelUpState implements State {
                     Weapon old = game.currentWeapon;
                     if (old instanceof gameproject.weapon.Shotgun &&
                         game.player.getBreakthroughLevel(gameproject.skill.Upgrade.EXPLOSIVE_CORPSE) > 0 &&
-                        game.player.getUpgradeLevel(gameproject.skill.Upgrade.DAMAGE) > 0) {
+                        game.player.getUpgradeLevel(gameproject.skill.Upgrade.DAMAGE) >= 3) {
                         game.currentWeapon = transferStats(old, new gameproject.weapon.HellfireBoomstick());
                     } else if (old instanceof gameproject.weapon.AssaultRifle &&
-                        game.player.getUpgradeLevel(gameproject.skill.Upgrade.OPTICAL_SCOPE) > 0) {
+                        game.player.getUpgradeLevel(gameproject.skill.Upgrade.OPTICAL_SCOPE) >= 3) {
                         game.currentWeapon = transferStats(old, new gameproject.weapon.Railgun());
                     } else if (old instanceof gameproject.weapon.SMG &&
                         game.player.getBreakthroughLevel(gameproject.skill.Upgrade.CHAIN_LIGHTNING) > 0 &&
-                        game.player.getUpgradeLevel(gameproject.skill.Upgrade.FIRE_RATE) > 0) {
+                        game.player.getUpgradeLevel(gameproject.skill.Upgrade.FIRE_RATE) >= 3) {
                         game.currentWeapon = transferStats(old, new gameproject.weapon.LightningGun());
                     }
 

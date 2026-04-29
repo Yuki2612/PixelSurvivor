@@ -1,6 +1,6 @@
-Gold:74
-Souls:133
+Gold:194
+Souls:23
 SelectedClass:NINJA
 Unlocked:NINJA,MERCENARY,
-Stats:2,5,3,2,0,1
-Skills:CHAIN_LIGHTNING=1,TRAIL_OF_FIRE=2,
+Stats:2,4,1,1,0,1
+Skills:TRAIL_OF_FIRE=1,CHAIN_LIGHTNING=1,

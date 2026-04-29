@@ -114,17 +114,24 @@ public class AssassinEnemy extends Enemy {
     @Override
     public void draw(Graphics g) {
         if (isInvisible) {
-            // Vẽ mờ đi khi tàng hình
+            // V\u1ebd th\u1ee7 c\u00f4ng \u0111\u1ec3 tr\u00e1nh xung \u0111\u1ed9t composite v\u1edbi drawSprite()
+            // drawSprite() ghi \u0111\u00e8 alpha v\u1ec1 1.0f n\u1ebfu kh\u00f4ng isDying \u2014 n\u00ean ta b\u1ecf qua n\u00f3
             Graphics2D g2d = (Graphics2D) g.create();
             g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.3f));
-            drawSprite(g2d, "enemy" + tier);
+            java.awt.image.BufferedImage img = gameproject.ImageManager.get("enemy" + tier);
+            if (img != null) {
+                g2d.drawImage(img, (int) x - 10, (int) y - 20, size + 20, size + 20, null);
+            } else {
+                g2d.setColor(color);
+                g2d.fillRect((int) x, (int) y, size, size);
+            }
             g2d.dispose();
+            // Kh\u00f4ng v\u1ebd HP bar v\u00e0 ch\u1ea5m \u0111en khi t\u00e0ng h\u00ecnh \u2014 \u1ea9n ho\u00e0n to\u00e0n
         } else {
             drawSprite(g, "enemy" + tier);
+            // Ch\u1ea5m \u0111en nh\u1eadn di\u1ec7n \u2014 ch\u1ec9 hi\u1ec7n khi kh\u00f4ng t\u00e0ng h\u00ecnh
+            g.setColor(Color.BLACK);
+            g.fillOval((int) x + size / 2 - 4, (int) y - 12, 8, 8);
         }
-
-        // Đánh dấu sát thủ bằng chấm đen
-        g.setColor(Color.BLACK);
-        g.fillOval((int) x + size / 2 - 4, (int) y - 12, 8, 8);
     }
 }

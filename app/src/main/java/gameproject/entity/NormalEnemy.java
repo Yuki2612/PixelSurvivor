@@ -57,14 +57,9 @@ public class NormalEnemy extends Enemy {
             moveX = (dx / distance) * currentSpeed;
             moveY = (dy / distance) * currentSpeed;
         } else {
-            if (wanderTimer <= 0) {
-                wanderX = rand.nextFloat() * 2 - 1;
-                wanderY = rand.nextFloat() * 2 - 1;
-                wanderTimer = 60 + rand.nextInt(60);
-            }
-            moveX = wanderX * (currentSpeed * 0.5f);
-            moveY = wanderY * (currentSpeed * 0.5f);
-            wanderTimer--;
+            // Đi về phía player chậm rãi khi ngoài tầm nhìn
+            moveX = (dx / distance) * (currentSpeed * 0.4f);
+            moveY = (dy / distance) * (currentSpeed * 0.4f);
         }
 
         for (Enemy other : allEnemies) {

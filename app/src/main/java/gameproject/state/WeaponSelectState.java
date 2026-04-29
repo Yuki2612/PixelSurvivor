@@ -7,39 +7,42 @@ import gameproject.weapon.*;
 import gameproject.skill.Upgrade;
 
 public class WeaponSelectState implements State {
-    
+
     private Weapon[] options = null;
 
     // Chuyển tỉ lệ cooldown & range từ vũ khí cũ sang vũ khí được chọn
     private Weapon transferStats(Weapon from, Weapon to) {
         float cooldownRatio = (float) from.cooldown / from.baseCooldown;
-        float rangeRatio    = from.range / from.baseRange;
+        float rangeRatio = from.range / from.baseRange;
         to.cooldown = Math.max(30, (long) (to.baseCooldown * cooldownRatio));
-        to.range    = to.baseRange * rangeRatio;
+        to.range = to.baseRange * rangeRatio;
         return to;
     }
 
     @Override
     public void update(GamePanel game) {
+
         if (options == null) {
             options = new Weapon[3];
             options[0] = new Shotgun();
             options[1] = new AssaultRifle();
             options[2] = new SMG();
-            
-            // Hiển thị phiên bản tiến hóa nếu đủ điều kiện
+
+            // Shotgun + Explosive Corpse lv1 + Might lv3 → Hellfire Boomstick
             if (game.currentWeapon instanceof Shotgun &&
-                game.player.getBreakthroughLevel(Upgrade.EXPLOSIVE_CORPSE) > 0 &&
-                game.player.getUpgradeLevel(Upgrade.DAMAGE) >= 1) {
+                    game.player.getBreakthroughLevel(Upgrade.EXPLOSIVE_CORPSE) > 0 &&
+                    game.player.getUpgradeLevel(Upgrade.DAMAGE) >= 3) {
                 options[0] = new HellfireBoomstick();
             }
+            // AssaultRifle + Optical Scope lv3 → Railgun
             if (game.currentWeapon instanceof AssaultRifle &&
-                game.player.getUpgradeLevel(Upgrade.OPTICAL_SCOPE) > 0) {
+                    game.player.getUpgradeLevel(Upgrade.OPTICAL_SCOPE) >= 3) {
                 options[1] = new Railgun();
             }
+            // SMG + Chain Lightning lv1 + Fire Rate lv3 → Lightning Gun
             if (game.currentWeapon instanceof SMG &&
-                game.player.getBreakthroughLevel(Upgrade.CHAIN_LIGHTNING) > 0 &&
-                game.player.getUpgradeLevel(Upgrade.FIRE_RATE) >= 1) {
+                    game.player.getBreakthroughLevel(Upgrade.CHAIN_LIGHTNING) > 0 &&
+                    game.player.getUpgradeLevel(Upgrade.FIRE_RATE) >= 3) {
                 options[2] = new LightningGun();
             }
         }

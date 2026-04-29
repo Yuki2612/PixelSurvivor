@@ -1,31 +1,29 @@
 package gameproject;
 
+import java.awt.AlphaComposite;
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.util.ArrayList;
 import java.util.Iterator;
 
-import gameproject.skill.Upgrade;
+import gameproject.entity.Enemy;
 
 public class VFXManager {
 
-    // 1. NHÚNG TRỰC TIẾP VÀO ĐÂY THÀNH INNER CLASS
+    // ── Inner classes ──────────────────────────────────────────────
     public static class FireZone {
         public float x, y;
         public long expireTime;
-        public boolean isExplosion;
-        public boolean isAcid;
+        public boolean isExplosion, isAcid;
         public int radius;
 
         public FireZone(float x, float y, long expireTime, boolean isExplosion, boolean isAcid, int radius) {
-            this.x = x;
-            this.y = y;
-            this.expireTime = expireTime;
-            this.isExplosion = isExplosion;
-            this.isAcid = isAcid;
-            this.radius = radius;
+            this.x = x; this.y = y; this.expireTime = expireTime;
+            this.isExplosion = isExplosion; this.isAcid = isAcid; this.radius = radius;
         }
     }
 
@@ -34,13 +32,12 @@ public class VFXManager {
         public int damage;
         public long expireTime;
         public Color color;
+        public boolean isCrit;
 
-        public DamageText(float x, float y, int damage, long currentTime, Color color) {
-            this.x = x;
-            this.y = y;
-            this.damage = damage;
-            this.expireTime = currentTime + 700;
-            this.color = color;
+        public DamageText(float x, float y, int damage, long currentTime, Color color, boolean isCrit) {
+            this.x = x; this.y = y; this.damage = damage;
+            this.expireTime = currentTime + (isCrit ? 900 : 700);
+            this.color = color; this.isCrit = isCrit;
         }
     }
 
@@ -48,29 +45,75 @@ public class VFXManager {
         public float x1, y1, x2, y2;
         public long expireTime;
         public LaserVFX(float x1, float y1, float x2, float y2, long currentTime) {
-            this.x1 = x1;
-            this.y1 = y1;
-            this.x2 = x2;
-            this.y2 = y2;
-            this.expireTime = currentTime + 400; // Tồn tại 0.4s
+            this.x1 = x1; this.y1 = y1; this.x2 = x2; this.y2 = y2;
+            this.expireTime = currentTime + 400;
         }
     }
 
-    // 2. KHAI BÁO BIẾN BÌNH THƯỜNG
-    public ArrayList<FireZone> fireZones = new ArrayList<>();
-    public ArrayList<DamageText> damageTexts = new ArrayList<>();
-    public ArrayList<LaserVFX> lasers = new ArrayList<>();
+    /** Particle bụi / máu khi quái chết hoặc bị hit */
+    public static class Particle {
+        public float x, y, vx, vy;
+        public long expireTime;
+        public Color color;
+        public int size;
+
+        public Particle(float x, float y, float vx, float vy, long currentTime, Color color, int size, int lifespanMs) {
+            this.x = x; this.y = y; this.vx = vx; this.vy = vy;
+            this.expireTime = currentTime + lifespanMs;
+            this.color = color; this.size = size;
+        }
+    }
+
+    /** Afterimage của Player khi dash */
+    public static class DashAfterimage {
+        public float x, y;
+        public long expireTime;
+
+        public DashAfterimage(float x, float y, long currentTime) {
+            this.x = x; this.y = y;
+            this.expireTime = currentTime + 150;
+        }
+    }
+
+    /** Banner thông báo Wave / Boss */
+    public static class WaveBanner {
+        public String text;
+        public Color color;
+        public long expireTime;
+
+        public WaveBanner(String text, Color color, long currentTime) {
+            this.text = text; this.color = color;
+            this.expireTime = currentTime + 2500;
+        }
+    }
+
+    // ── State variables ────────────────────────────────────────────
+    public ArrayList<FireZone>       fireZones      = new ArrayList<>();
+    public ArrayList<DamageText>     damageTexts    = new ArrayList<>();
+    public ArrayList<LaserVFX>       lasers         = new ArrayList<>();
+    public ArrayList<Particle>       particles      = new ArrayList<>();
+    public ArrayList<DashAfterimage> afterimages    = new ArrayList<>();
+    private ArrayList<WaveBanner>    waveBanners    = new ArrayList<>();
 
     public boolean showDamageText = true;
     private int shakeTimer = 0;
     private int currentDx = 0, currentDy = 0;
 
-    public void triggerScreenShake(int durationFrames) {
-        this.shakeTimer = durationFrames;
+    // Player-damage screen flash (red vignette)
+    private long playerDamageFlashEndTime = 0;
+
+    // ── Public API ─────────────────────────────────────────────────
+
+    public void triggerScreenShake(int durationFrames) { this.shakeTimer = durationFrames; }
+
+    public void triggerPlayerDamageFlash(long currentTime) {
+        playerDamageFlashEndTime = currentTime + 350;
     }
 
     public void addExplosion(float x, float y, float radius, long currentTime) {
-        fireZones.add(new FireZone(x - radius / 2, y - radius / 2, currentTime + 200, true, false, (int)radius));
+        fireZones.add(new FireZone(x - radius / 2, y - radius / 2, currentTime + 200, true, false, (int) radius));
+        // Particle burst cho explosion
+        spawnParticleBurst(x, y, 12, currentTime, new Color(255, 100, 0), new Color(255, 220, 50), 5, 8, 500);
     }
 
     public void addFireTrail(float x, float y, long currentTime) {
@@ -78,7 +121,7 @@ public class VFXManager {
     }
 
     public void addAcidZone(float x, float y, float radius, long currentTime) {
-        fireZones.add(new FireZone(x - radius / 2, y - radius / 2, currentTime + 5000, false, true, (int)radius));
+        fireZones.add(new FireZone(x - radius / 2, y - radius / 2, currentTime + 5000, false, true, (int) radius));
     }
 
     public void addLaser(float x1, float y1, float x2, float y2, long currentTime) {
@@ -86,39 +129,82 @@ public class VFXManager {
     }
 
     public void addDamageText(float x, float y, int damage, long currentTime, Color color) {
-        if (showDamageText) {
-            float offsetX = (float) (Math.random() * 20 - 10);
-            float offsetY = (float) (Math.random() * 10 - 5);
-            damageTexts.add(new DamageText(x + offsetX, y + offsetY, damage, currentTime, color));
-        }
+        if (!showDamageText) return;
+        float ox = (float) (Math.random() * 20 - 10);
+        float oy = (float) (Math.random() * 10 - 5);
+        damageTexts.add(new DamageText(x + ox, y + oy, damage, currentTime, color, false));
     }
-    
+
     public void addDamageText(float x, float y, int damage, long currentTime) {
         addDamageText(x, y, damage, currentTime, Color.WHITE);
     }
 
-    public void update(long currentTime) {
-        Iterator<FireZone> fIt = fireZones.iterator();
-        while (fIt.hasNext()) {
-            if (currentTime > fIt.next().expireTime)
-                fIt.remove();
+    /** Crit damage text — vàng, lớn hơn, có prefix "!" */
+    public void addCritDamageText(float x, float y, int damage, long currentTime) {
+        if (!showDamageText) return;
+        float ox = (float) (Math.random() * 20 - 10);
+        float oy = (float) (Math.random() * 10 - 5);
+        damageTexts.add(new DamageText(x + ox, y + oy, damage, currentTime, new Color(255, 220, 0), true));
+    }
+
+    /** Particle burst khi quái chết — 200ms khớp với death fade 150ms */
+    public void spawnDeathParticles(float x, float y, long currentTime, Color baseColor) {
+        spawnParticleBurst(x, y, 8, currentTime, baseColor, Color.WHITE, 2, 4, 200);
+    }
+
+    /** Dash afterimage: gọi mỗi frame khi player đang dash */
+    public void addDashAfterimage(float playerX, float playerY, long currentTime) {
+        afterimages.add(new DashAfterimage(playerX, playerY, currentTime));
+    }
+
+    /** Wave/Boss announce banner */
+    public void showWaveBanner(String text, Color color, long currentTime) {
+        waveBanners.clear(); // Xóa banner cũ nếu còn
+        waveBanners.add(new WaveBanner(text, color, currentTime));
+    }
+
+    // ── Private helpers ────────────────────────────────────────────
+
+    private void spawnParticleBurst(float cx, float cy, int count, long currentTime,
+                                    Color color1, Color color2, int minSize, int maxSize, int lifespanMs) {
+        for (int i = 0; i < count; i++) {
+            double angle = Math.random() * 2 * Math.PI;
+            float speed = 1.5f + (float) (Math.random() * 4.0f);
+            float vx = (float) Math.cos(angle) * speed;
+            float vy = (float) Math.sin(angle) * speed;
+            Color c = Math.random() < 0.5 ? color1 : color2;
+            int sz = minSize + (int) (Math.random() * (maxSize - minSize));
+            particles.add(new Particle(cx, cy, vx, vy, currentTime, c, sz, lifespanMs));
         }
+    }
+
+    // ── Update ─────────────────────────────────────────────────────
+
+    public void update(long currentTime) {
+        fireZones.removeIf(fz -> currentTime > fz.expireTime);
+        lasers.removeIf(l  -> currentTime > l.expireTime);
+        afterimages.removeIf(a -> currentTime > a.expireTime);
+        waveBanners.removeIf(b -> currentTime > b.expireTime);
 
         Iterator<DamageText> dIt = damageTexts.iterator();
         while (dIt.hasNext()) {
             DamageText dt = dIt.next();
-            if (currentTime > dt.expireTime)
-                dIt.remove();
-            else
-                dt.y -= 0.6f;
+            if (currentTime > dt.expireTime) dIt.remove();
+            else dt.y -= (dt.isCrit ? 0.9f : 0.6f);
         }
 
-        Iterator<LaserVFX> lIt = lasers.iterator();
-        while (lIt.hasNext()) {
-            if (currentTime > lIt.next().expireTime)
-                lIt.remove();
+        Iterator<Particle> pIt = particles.iterator();
+        while (pIt.hasNext()) {
+            Particle p = pIt.next();
+            if (currentTime > p.expireTime) { pIt.remove(); continue; }
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.12f; // nhẹ gravity
+            p.vx *= 0.92f;
         }
     }
+
+    // ── Screen shake ───────────────────────────────────────────────
 
     public void applyScreenShake(Graphics2D g2d) {
         if (shakeTimer > 0) {
@@ -127,33 +213,48 @@ public class VFXManager {
             g2d.translate(currentDx, currentDy);
             shakeTimer--;
         } else {
-            currentDx = 0;
-            currentDy = 0;
+            currentDx = currentDy = 0;
         }
     }
 
     public void resetScreenShake(Graphics2D g2d) {
-        if (currentDx != 0 || currentDy != 0) {
-            g2d.translate(-currentDx, -currentDy);
-        }
+        if (currentDx != 0 || currentDy != 0) g2d.translate(-currentDx, -currentDy);
     }
+
+    // ── Draw ───────────────────────────────────────────────────────
 
     public void draw(Graphics g, Player player) {
         Graphics2D g2d = (Graphics2D) g;
-        for (LaserVFX l : lasers) {
-            g2d.setColor(new Color(0, 255, 255, 220));
-            g2d.setStroke(new java.awt.BasicStroke(24));
-            g2d.drawLine((int)l.x1, (int)l.y1, (int)l.x2, (int)l.y2);
-            g2d.setColor(Color.WHITE);
-            g2d.setStroke(new java.awt.BasicStroke(10));
-            g2d.drawLine((int)l.x1, (int)l.y1, (int)l.x2, (int)l.y2);
-            g2d.setStroke(new java.awt.BasicStroke(1));
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        // 1. Dash afterimages (vẽ trước player)
+        for (DashAfterimage a : afterimages) {
+            java.awt.image.BufferedImage img = ImageManager.get("player");
+            if (img != null) {
+                g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.25f));
+                g2d.drawImage(img, (int) a.x - 10, (int) a.y - 20, 45, 45, null);
+                g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
+            }
         }
 
+        // 2. Lasers
+        for (LaserVFX l : lasers) {
+            g2d.setColor(new Color(0, 255, 255, 220));
+            g2d.setStroke(new BasicStroke(24));
+            g2d.drawLine((int) l.x1, (int) l.y1, (int) l.x2, (int) l.y2);
+            g2d.setColor(Color.WHITE);
+            g2d.setStroke(new BasicStroke(10));
+            g2d.drawLine((int) l.x1, (int) l.y1, (int) l.x2, (int) l.y2);
+            g2d.setStroke(new BasicStroke(1));
+        }
+
+        // 3. Fire zones / acid / explosion
         for (FireZone fz : fireZones) {
             if (fz.isExplosion) {
                 g.setColor(new Color(255, 50, 50, 150));
                 g.fillOval((int) fz.x, (int) fz.y, fz.radius, fz.radius);
+                g.setColor(new Color(255, 200, 0, 100));
+                g.drawOval((int) fz.x, (int) fz.y, fz.radius, fz.radius);
             } else if (fz.isAcid) {
                 g.setColor(new Color(50, 255, 50, 80));
                 g.fillOval((int) fz.x, (int) fz.y, fz.radius, fz.radius);
@@ -165,29 +266,78 @@ public class VFXManager {
             }
         }
 
+        // 4. Particles
+        for (Particle p : particles) {
+            g2d.setColor(p.color);
+            g2d.fillRect((int) p.x, (int) p.y, p.size, p.size);
+        }
+
+        // 5. Damage texts
         if (showDamageText) {
-            g.setFont(new Font("Arial", Font.BOLD, 14));
             for (DamageText dt : damageTexts) {
-                String text = String.valueOf(dt.damage);
-                g.setColor(Color.BLACK);
-                if (dt.color == Color.WHITE && dt.damage >= 300) {
-                    g.setFont(new Font("Arial", Font.BOLD, 22));
-                    g.drawString(text, (int) dt.x - 2, (int) dt.y);
-                    g.drawString(text, (int) dt.x + 2, (int) dt.y);
-                    g.drawString(text, (int) dt.x, (int) dt.y - 2);
-                    g.drawString(text, (int) dt.x, (int) dt.y + 2);
-                    g.setColor(dt.color);
-                    g.drawString(text, (int) dt.x, (int) dt.y);
-                    g.setFont(new Font("Arial", Font.BOLD, 14));
+                if (dt.isCrit) {
+                    // Crit: vàng, to hơn, prefix "!"
+                    g2d.setFont(FontManager.getFont(22f));
+                    String text = "! " + dt.damage;
+                    g2d.setColor(new Color(80, 60, 0));
+                    g2d.drawString(text, (int) dt.x + 2, (int) dt.y + 2);
+                    g2d.setColor(new Color(255, 220, 0));
+                    g2d.drawString(text, (int) dt.x, (int) dt.y);
+                } else if (dt.color == Color.WHITE && dt.damage >= 300) {
+                    // Damage lớn
+                    g2d.setFont(FontManager.getFont(20f));
+                    String text = String.valueOf(dt.damage);
+                    g2d.setColor(Color.BLACK);
+                    for (int dx = -2; dx <= 2; dx++) for (int dy = -2; dy <= 2; dy++)
+                        if (dx != 0 || dy != 0) g2d.drawString(text, (int) dt.x + dx, (int) dt.y + dy);
+                    g2d.setColor(Color.WHITE);
+                    g2d.drawString(text, (int) dt.x, (int) dt.y);
                 } else {
-                    g.drawString(text, (int) dt.x - 1, (int) dt.y - 1);
-                    g.drawString(text, (int) dt.x + 1, (int) dt.y - 1);
-                    g.drawString(text, (int) dt.x - 1, (int) dt.y + 1);
-                    g.drawString(text, (int) dt.x + 1, (int) dt.y + 1);
-                    g.setColor(dt.color);
-                    g.drawString(text, (int) dt.x, (int) dt.y);
+                    g2d.setFont(FontManager.getFont(15f));
+                    String text = String.valueOf(dt.damage);
+                    g2d.setColor(Color.BLACK);
+                    g2d.drawString(text, (int) dt.x + 1, (int) dt.y + 1);
+                    g2d.setColor(dt.color);
+                    g2d.drawString(text, (int) dt.x, (int) dt.y);
                 }
             }
+        }
+    }
+
+    /** Vẽ sau cùng (overlay toàn màn hình) — gọi SAU resetScreenShake */
+    public void drawOverlays(Graphics g, int screenW, int screenH, long currentTime) {
+        Graphics2D g2d = (Graphics2D) g;
+
+        // Player damage flash (red vignette)
+        if (currentTime < playerDamageFlashEndTime) {
+            float alpha = 0.35f * (float)(playerDamageFlashEndTime - currentTime) / 350f;
+            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, Math.min(0.35f, alpha)));
+            g2d.setColor(Color.RED);
+            g2d.fillRect(0, 0, screenW, screenH);
+            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
+        }
+
+        // Wave banners
+        for (WaveBanner b : waveBanners) {
+            float life = (float)(b.expireTime - currentTime) / 2500f;
+            float alpha = Math.min(1f, life * 3f); // fade in fast, fade out slow
+            if (alpha <= 0) continue;
+            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+
+            g2d.setFont(FontManager.getFont(52f));
+            int tw = g2d.getFontMetrics().stringWidth(b.text);
+            int bx = screenW / 2 - tw / 2;
+            int by = screenH / 3;
+
+            // Shadow
+            g2d.setColor(new Color(0, 0, 0, 180));
+            g2d.fillRoundRect(bx - 30, by - 55, tw + 60, 75, 16, 16);
+
+            g2d.setColor(Color.BLACK);
+            g2d.drawString(b.text, bx + 3, by + 3);
+            g2d.setColor(b.color);
+            g2d.drawString(b.text, bx, by);
+            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
         }
     }
 }

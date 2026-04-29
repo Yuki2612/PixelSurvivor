@@ -21,6 +21,7 @@ public class Projectile {
     public boolean isPlayerExplosive = false;
     public boolean isHellfire = false;
     public boolean isRailgun = false;
+    public boolean isCrit = false; // Crit hit — hiện text vàng tại địch khi trúng
 
     // THÊM: Hỗ trợ đạn nổ cho Pháo thủ
     public boolean isExplosive = false;
@@ -47,12 +48,12 @@ public class Projectile {
         this.speedY = (dy / distance) * finalSpeed;
     }
 
-    public void update(int screenWidth, int screenHeight) {
+    public void update(int worldWidth, int worldHeight) {
         x += speedX;
         y += speedY;
 
         float distTraveled = (float) Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
-        if (distTraveled > maxRange || x < 0 || x > screenWidth || y < 0 || y > screenHeight) {
+        if (distTraveled > maxRange || x < 0 || x > worldWidth || y < 0 || y > worldHeight) {
             active = false;
         }
     }

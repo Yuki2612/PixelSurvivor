@@ -100,7 +100,7 @@ public class CannoneerEnemy extends Enemy {
         if (canShoot) {
             canShoot = false;
             // Đạn bay chậm
-            Projectile p = new Projectile(x, y, targetPX, targetPY, 0.4f, 400f);
+            Projectile p = new Projectile(x, y, targetPX, targetPY, 0.5f, 600f);
             p.isEnemyBullet = true;
             p.isExplosive = true; // Cờ đạn nổ
             p.explosionRadius = 40 + (tier * 10); // Bán kính nổ tăng theo tier

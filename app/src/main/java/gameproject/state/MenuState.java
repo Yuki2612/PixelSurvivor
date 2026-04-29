@@ -21,6 +21,8 @@ public class MenuState implements State {
                 } else if (my >= game.screenHeight / 2 + 110 && my <= game.screenHeight / 2 + 160) {
                     game.changeState(new SettingsState());
                 } else if (my >= game.screenHeight / 2 + 180 && my <= game.screenHeight / 2 + 230) {
+                    game.changeState(new GuideState());
+                } else if (my >= game.screenHeight / 2 + 250 && my <= game.screenHeight / 2 + 300) {
                     gameproject.meta.PlayerData.save();
                     System.exit(0);
                 }
