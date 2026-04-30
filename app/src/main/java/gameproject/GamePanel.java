@@ -17,6 +17,7 @@ import gameproject.state.WeaponSelectState;
 import gameproject.state.CharacterSelectState;
 import gameproject.state.SettingsState;
 import gameproject.state.GuideState;
+import gameproject.state.SkillsState;
 import gameproject.state.StatsState;
 import gameproject.meta.PlayerData;
 import gameproject.meta.CharacterClass;
@@ -144,17 +145,21 @@ public class GamePanel extends JPanel implements Runnable {
 
     public void changeState(State state) {
         this.currentState = state;
+        updateMusic();
+    }
 
-        // Tự động chuyển nhạc nền dựa trên trạng thái và wave
-        if (state instanceof MenuState || state instanceof CharacterSelectState || 
-            state instanceof SettingsState || state instanceof GuideState || 
-            state instanceof StatsState) {
+    private void updateMusic() {
+        if (currentState instanceof MenuState || currentState instanceof CharacterSelectState ||
+                currentState instanceof SettingsState || currentState instanceof GuideState ||
+                currentState instanceof StatsState || currentState instanceof SkillsState) {
             SoundManager.playMusic("menubgm");
-        } else {
+        } else if (currentState instanceof gameproject.state.PlayingState ||
+                currentState instanceof gameproject.state.LevelUpState ||
+                currentState instanceof gameproject.state.WeaponSelectState) {
             // Logic nhạc trong gameplay
-            if (entityManager != null && entityManager.enemies.stream().anyMatch(e -> e.isBoss)) {
+            if (entityManager != null && entityManager.activeBossCount > 0) {
                 SoundManager.playMusic("bossbgm");
-            } else if (entityManager != null && entityManager.waveCount >= 10) {
+            } else if (entityManager != null && entityManager.waveCount >= 15) {
                 SoundManager.playMusic("gamebgm2");
             } else {
                 SoundManager.playMusic("gamebgm1");
@@ -226,6 +231,7 @@ public class GamePanel extends JPanel implements Runnable {
         while (true) {
             if (System.nanoTime() - lastFrame >= timePerFrame) {
                 SoundManager.updateLoopFading();
+                updateMusic();
                 if (currentState != null) {
                     currentState.update(this);
                 }

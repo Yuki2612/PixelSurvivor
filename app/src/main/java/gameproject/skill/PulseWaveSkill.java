@@ -23,10 +23,11 @@ public class PulseWaveSkill implements PassiveSkill {
             if (currentTime - lastPulseTime > cooldown) {
                 lastPulseTime = currentTime;
 
-                float soulMulti = 1.0f + (gameproject.meta.PlayerData.skillSoulLevels.getOrDefault(Upgrade.PULSE_WAVE, 0) * 0.05f);
-                pulseRadius = (int)((100 + level * 20) * soulMulti);
-                int damage = (int)((20 + level * 10) * soulMulti);
-                float knockback = (40f + level * 5f) * soulMulti;
+                float soulMulti = 1.0f
+                        + (gameproject.meta.PlayerData.skillSoulLevels.getOrDefault(Upgrade.PULSE_WAVE, 0) * 0.05f);
+                pulseRadius = (int) ((100 + level * 20) * soulMulti);
+                int damage = (int) ((20 + level * 10) * soulMulti);
+                float knockback = (10f + level * 2f) * soulMulti;
 
                 lastPulseX = player.getX();
                 lastPulseY = player.getY();

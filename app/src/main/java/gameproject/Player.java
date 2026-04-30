@@ -28,7 +28,7 @@ public class Player implements Renderable {
         return y + SIZE; // Chân của người chơi
     }
 
-    private float speed = 5.0f;
+    private float speed = 4f;
     private long dashCooldown = 2000;
 
     private int hearts = 3;
@@ -51,21 +51,22 @@ public class Player implements Renderable {
     public enum PlayerState {
         IDLE, RUN
     }
+
     private PlayerState currentState = PlayerState.IDLE;
     private String animDir = "down";
     private boolean facingRight = true;
-    
+
     private Map<String, Animation> animations = new HashMap<>();
     private Animation activeAnim;
 
     public Player(float startX, float startY, CharacterClass charClass) {
         this.x = startX;
         this.y = startY;
-        this.dashCooldown = (long)(2000 * (1.0f - PlayerData.statDashLevel * 0.02f));
+        this.dashCooldown = (long) (2000 * (1.0f - PlayerData.statDashLevel * 0.02f));
         this.lastDashTime = -dashCooldown;
         this.hearts = charClass.baseHp + (PlayerData.statHealthLevel / 10);
         this.speed = (5.0f * charClass.speedMulti) * (1.0f + PlayerData.statSpeedLevel * 0.02f);
-        
+
         initAnimations(charClass);
     }
 
@@ -74,23 +75,25 @@ public class Player implements Renderable {
         String fallback = "player1";
 
         // Định nghĩa các cặp State_Direction
-        String[] states = {"idle", "run"};
-        String[] dirs = {"side", "down", "up"};
+        String[] states = { "idle", "run" };
+        String[] dirs = { "side", "down", "up" };
 
         for (String s : states) {
             for (String d : dirs) {
                 String key = s + "_" + d;
                 int delay = s.equals("run") ? 6 : 8; // Chạy nhanh hơn đứng yên
                 Animation anim = new Animation(delay);
-                
+
                 // Caching: Lấy từ ImageManager
                 BufferedImage[] frames = ImageManager.getAnimation(pKey + "_" + key);
-                if (frames == null) frames = ImageManager.getAnimation(fallback + "_" + key);
-                
+                if (frames == null)
+                    frames = ImageManager.getAnimation(fallback + "_" + key);
+
                 // Fallback đặc biệt cho idle_up
                 if (frames == null && s.equals("idle") && d.equals("up")) {
                     frames = ImageManager.getAnimation(pKey + "_run_up");
-                    if (frames == null) frames = ImageManager.getAnimation(fallback + "_run_up");
+                    if (frames == null)
+                        frames = ImageManager.getAnimation(fallback + "_run_up");
                 }
 
                 if (frames != null) {
@@ -99,16 +102,17 @@ public class Player implements Renderable {
                 }
             }
         }
-        
+
         // Mặc định
         activeAnim = animations.get("idle_down");
-        if (activeAnim == null) activeAnim = animations.get("idle_side");
+        if (activeAnim == null)
+            activeAnim = animations.get("idle_side");
     }
 
     private void setState(PlayerState newState, String newDir) {
         String stateKey = (newState == PlayerState.RUN ? "run" : "idle") + "_" + newDir;
         Animation nextAnim = animations.get(stateKey);
-        
+
         if (nextAnim != null && nextAnim != activeAnim) {
             activeAnim = nextAnim;
         }
@@ -126,13 +130,13 @@ public class Player implements Renderable {
             } else {
                 float nextX = x + dashDirX * DASH_SPEED;
                 float nextY = y + dashDirY * DASH_SPEED;
-                
+
                 // Kiểm tra va chạm pixel-perfect với Hitbox thực tế
                 if (!game.mapManager.isColliding(nextX, nextY, SIZE, SIZE)) {
                     x = nextX;
                     y = nextY;
                 }
-                
+
                 x = Math.max(0, Math.min(x, GamePanel.WORLD_WIDTH - SIZE));
                 y = Math.max(0, Math.min(y, GamePanel.WORLD_HEIGHT - SIZE));
                 isMoving = true;
@@ -184,15 +188,18 @@ public class Player implements Renderable {
                 lastDirY = currentDirY;
             } else {
                 // Hướng khi đứng yên dựa trên hướng cuối cùng
-                if (lastDirY < 0) nextDir = "up";
-                else if (lastDirY > 0) nextDir = "down";
-                else nextDir = "side";
+                if (lastDirY < 0)
+                    nextDir = "up";
+                else if (lastDirY > 0)
+                    nextDir = "down";
+                else
+                    nextDir = "side";
             }
         }
 
         // Chuyển đổi State & Animation thông qua FSM
         setState(isMoving ? PlayerState.RUN : PlayerState.IDLE, nextDir);
-        
+
         if (activeAnim != null) {
             activeAnim.update();
         }
@@ -208,7 +215,7 @@ public class Player implements Renderable {
             int drawX = (int) x - 10;
             int drawY = (int) y - 20;
             int drawSize = SIZE + 20;
-            
+
             Graphics2D g2d = (Graphics2D) g.create();
             if (isDashing) {
                 g2d.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, 0.5f));
@@ -330,7 +337,8 @@ public class Player implements Renderable {
 
     public void addInvulnerability(long duration) {
         long now = System.currentTimeMillis();
-        if (invulnerableUntil < now) invulnerableUntil = now;
+        if (invulnerableUntil < now)
+            invulnerableUntil = now;
         invulnerableUntil += duration;
     }
 

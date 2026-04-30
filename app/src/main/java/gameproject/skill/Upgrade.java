@@ -10,7 +10,7 @@ public enum Upgrade {
         BULLET_SPEED("Aero Bullets (+12% Bullet Speed)", false, 10),
         CRIT_CHANCE("Precision (+7% Crit Chance)", false, 7),
         OPTICAL_SCOPE("Optical Scope (+9% Weapon Range)", false, 6),
-        VAMPIRISM("Vampirism (3% Heal chance on kill)", false, 5),
+        VAMPIRISM("Vampirism (1% Heal chance on kill)", false, 5),
 
         // Nâng cấp Đột phá (Breakthrough) - Tất cả Cap ở Lv 5
         CHAIN_LIGHTNING("Chain Lightning (+Bounces & Range)", true, 5),

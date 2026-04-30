@@ -90,17 +90,19 @@ public class MapManager {
             int rRow = (int) (Math.random() * (rows - 25)) + 10;
 
             List<Room> buildingRooms = new ArrayList<>();
-            int type = (int)(Math.random() * 4); // 0: Rect, 1: L, 2: T, 3: U
+            int type = (int) (Math.random() * 4); // 0: Rect, 1: L, 2: T, 3: U
 
             if (type == 0) { // Rectangle
                 buildingRooms.add(new Room(rCol, rRow, baseW, baseH));
             } else if (type == 1) { // L-Shape
                 buildingRooms.add(new Room(rCol, rRow, baseW, baseH));
-                buildingRooms.add(new Room(rCol + baseW - 2, rRow + baseH - 2, (int)(Math.random()*4)+6, (int)(Math.random()*4)+6));
+                buildingRooms.add(new Room(rCol + baseW - 2, rRow + baseH - 2, (int) (Math.random() * 4) + 6,
+                        (int) (Math.random() * 4) + 6));
             } else if (type == 2) { // T-Shape
                 buildingRooms.add(new Room(rCol, rRow, baseW, baseH));
-                int wingW = (int)(Math.random()*4)+6;
-                buildingRooms.add(new Room(rCol + baseW/2 - wingW/2, rRow + baseH - 2, wingW, (int)(Math.random()*4)+6));
+                int wingW = (int) (Math.random() * 4) + 6;
+                buildingRooms.add(
+                        new Room(rCol + baseW / 2 - wingW / 2, rRow + baseH - 2, wingW, (int) (Math.random() * 4) + 6));
             } else { // U-Shape
                 buildingRooms.add(new Room(rCol, rRow, baseW, baseH));
                 buildingRooms.add(new Room(rCol - 4, rRow + baseH - 2, 6, 8)); // Wing 1
@@ -115,9 +117,13 @@ public class MapManager {
                     break;
                 }
                 for (Room r : rooms) {
-                    if (br.intersects(r)) { overlapping = true; break; }
+                    if (br.intersects(r)) {
+                        overlapping = true;
+                        break;
+                    }
                 }
-                if (overlapping) break;
+                if (overlapping)
+                    break;
             }
 
             if (!overlapping) {
@@ -126,8 +132,8 @@ public class MapManager {
                 int[][] buildingMask = new int[rows][cols];
                 for (Room room : buildingRooms) {
                     rooms.add(room);
-                    components.add(new Rectangle(room.col * TILE_SIZE, room.row * TILE_SIZE, 
-                                                room.width * TILE_SIZE, room.height * TILE_SIZE));
+                    components.add(new Rectangle(room.col * TILE_SIZE, room.row * TILE_SIZE,
+                            room.width * TILE_SIZE, room.height * TILE_SIZE));
                     for (int r = room.row; r < room.row + room.height; r++) {
                         for (int c = room.col; c < room.col + room.width; c++) {
                             buildingMask[r][c] = 1; // Đánh dấu sàn nhà
@@ -138,10 +144,14 @@ public class MapManager {
                 // Tính toán giới hạn (Bounds) của toàn bộ khối nhà để xóa vật thể xung quanh
                 int minR = rows, maxR = 0, minC = cols, maxC = 0;
                 for (Room room : buildingRooms) {
-                    if (room.row < minR) minR = room.row;
-                    if (room.row + room.height > maxR) maxR = room.row + room.height;
-                    if (room.col < minC) minC = room.col;
-                    if (room.col + room.width > maxC) maxC = room.col + room.width;
+                    if (room.row < minR)
+                        minR = room.row;
+                    if (room.row + room.height > maxR)
+                        maxR = room.row + room.height;
+                    if (room.col < minC)
+                        minC = room.col;
+                    if (room.col + room.width > maxC)
+                        maxC = room.col + room.width;
                 }
 
                 // BƯỚC 2: XÓA VẬT THỂ XUNG QUANH (Clearance Zone 4 ô để nhà thoáng hơn)
@@ -161,11 +171,11 @@ public class MapManager {
                             grid[r][c].obstacle = null;
                         } else if (buildingMask[r][c] == 0) {
                             // Kiểm tra xem có kề cạnh sàn nhà không (Boolean Union Boundary)
-                            if (buildingMask[r-1][c] == 1 || buildingMask[r+1][c] == 1 || 
-                                buildingMask[r][c-1] == 1 || buildingMask[r][c+1] == 1 ||
-                                buildingMask[r-1][c-1] == 1 || buildingMask[r-1][c+1] == 1 ||
-                                buildingMask[r+1][c-1] == 1 || buildingMask[r+1][c+1] == 1) {
-                                
+                            if (buildingMask[r - 1][c] == 1 || buildingMask[r + 1][c] == 1 ||
+                                    buildingMask[r][c - 1] == 1 || buildingMask[r][c + 1] == 1 ||
+                                    buildingMask[r - 1][c - 1] == 1 || buildingMask[r - 1][c + 1] == 1 ||
+                                    buildingMask[r + 1][c - 1] == 1 || buildingMask[r + 1][c + 1] == 1) {
+
                                 grid[r][c].obstacle = new Wall(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
                             }
                         }
@@ -180,22 +190,23 @@ public class MapManager {
                         // Cửa Trên: Kiểm tra vùng 4x3 phía trên (bao gồm cả lề để tránh chạm tường bên)
                         if (isAreaClear(buildingMask, room.row - 3, midW - 1, 3, 4)) {
                             grid[room.row - 1][midW].obstacle = null;
-                            grid[room.row - 1][midW+1].obstacle = null;
+                            grid[room.row - 1][midW + 1].obstacle = null;
                             grid[room.row - 1][midW].isEntrance = true;
-                            grid[room.row - 1][midW+1].isEntrance = true;
+                            grid[room.row - 1][midW + 1].isEntrance = true;
                             buildingMask[room.row - 1][midW] = 1;
-                            buildingMask[room.row - 1][midW+1] = 1;
+                            buildingMask[room.row - 1][midW + 1] = 1;
                             buildingDoors.add(new Building.DoorInfo(midW * TILE_SIZE, (room.row - 1) * TILE_SIZE, "N"));
                         }
                         // Cửa Dưới: Kiểm tra vùng 4x3 phía dưới
                         else if (isAreaClear(buildingMask, room.row + room.height, midW - 1, 3, 4)) {
                             grid[room.row + room.height][midW].obstacle = null;
-                            grid[room.row + room.height][midW+1].obstacle = null;
+                            grid[room.row + room.height][midW + 1].obstacle = null;
                             grid[room.row + room.height][midW].isEntrance = true;
-                            grid[room.row + room.height][midW+1].isEntrance = true;
+                            grid[room.row + room.height][midW + 1].isEntrance = true;
                             buildingMask[room.row + room.height][midW] = 1;
-                            buildingMask[room.row + room.height][midW+1] = 1;
-                            buildingDoors.add(new Building.DoorInfo(midW * TILE_SIZE, (room.row + room.height) * TILE_SIZE, "S"));
+                            buildingMask[room.row + room.height][midW + 1] = 1;
+                            buildingDoors.add(
+                                    new Building.DoorInfo(midW * TILE_SIZE, (room.row + room.height) * TILE_SIZE, "S"));
                         }
                     }
 
@@ -204,22 +215,23 @@ public class MapManager {
                         // Cửa Trái: Kiểm tra vùng 3x4 bên trái
                         if (isAreaClear(buildingMask, midH - 1, room.col - 3, 4, 3)) {
                             grid[midH][room.col - 1].obstacle = null;
-                            grid[midH+1][room.col - 1].obstacle = null;
+                            grid[midH + 1][room.col - 1].obstacle = null;
                             grid[midH][room.col - 1].isEntrance = true;
-                            grid[midH+1][room.col - 1].isEntrance = true;
+                            grid[midH + 1][room.col - 1].isEntrance = true;
                             buildingMask[midH][room.col - 1] = 1;
-                            buildingMask[midH+1][room.col - 1] = 1;
+                            buildingMask[midH + 1][room.col - 1] = 1;
                             buildingDoors.add(new Building.DoorInfo((room.col - 1) * TILE_SIZE, midH * TILE_SIZE, "W"));
                         }
                         // Cửa Phải: Kiểm tra vùng 3x4 bên phải
                         else if (isAreaClear(buildingMask, midH - 1, room.col + room.width, 4, 3)) {
                             grid[midH][room.col + room.width].obstacle = null;
-                            grid[midH+1][room.col + room.width].obstacle = null;
+                            grid[midH + 1][room.col + room.width].obstacle = null;
                             grid[midH][room.col + room.width].isEntrance = true;
-                            grid[midH+1][room.col + room.width].isEntrance = true;
+                            grid[midH + 1][room.col + room.width].isEntrance = true;
                             buildingMask[midH][room.col + room.width] = 1;
-                            buildingMask[midH+1][room.col + room.width] = 1;
-                            buildingDoors.add(new Building.DoorInfo((room.col + room.width) * TILE_SIZE, midH * TILE_SIZE, "E"));
+                            buildingMask[midH + 1][room.col + room.width] = 1;
+                            buildingDoors.add(
+                                    new Building.DoorInfo((room.col + room.width) * TILE_SIZE, midH * TILE_SIZE, "E"));
                         }
                     }
                 }
@@ -234,17 +246,17 @@ public class MapManager {
 
                 // THÊM THÙNG GỖ VÀO BÊN TRONG (Tăng số lượng lên 3-7 thùng)
                 for (Room room : buildingRooms) {
-                    int numCrates = (int)(Math.random() * 5) + 3;
-                    for(int j=0; j<numCrates; j++) {
-                        int crateCol = room.col + 1 + (int)(Math.random() * (room.width - 2));
-                        int crateRow = room.row + 1 + (int)(Math.random() * (room.height - 2));
+                    int numCrates = (int) (Math.random() * 5) + 3;
+                    for (int j = 0; j < numCrates; j++) {
+                        int crateCol = room.col + 1 + (int) (Math.random() * (room.width - 2));
+                        int crateRow = room.row + 1 + (int) (Math.random() * (room.height - 2));
                         if (grid[crateRow][crateCol].obstacle == null) {
                             grid[crateRow][crateCol].obstacle = new WoodenCrate(crateCol * TILE_SIZE,
                                     crateRow * TILE_SIZE, TILE_SIZE, TILE_SIZE);
                         }
                     }
                 }
-                
+
                 buildingList.add(new Building(components, buildingDoors));
             }
             attempts++;
@@ -252,10 +264,6 @@ public class MapManager {
 
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
-                if (r == 0 || r == rows - 1 || c == 0 || c == cols - 1) {
-                    grid[r][c].obstacle = new Wall(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-                    continue;
-                }
                 // CHỈ SINH VẬT THỂ NẾU NẰM NGOÀI VÙNG ĐỆM CỦA NHÀ (isBuildingZone)
                 if (grid[r][c].obstacle == null && !grid[r][c].isBuildingZone) {
                     double roll = Math.random();
@@ -270,7 +278,6 @@ public class MapManager {
         }
         clearSpawnArea();
     }
-
 
     private void clearSpawnArea() {
         int centerC = (gameproject.GamePanel.WORLD_WIDTH / 2) / TILE_SIZE;
@@ -368,11 +375,13 @@ public class MapManager {
         for (Obstacle obs : near) {
             if (obs.isSolid()) {
                 if (obs.getHitbox() != null) {
-                    if (obs.getHitbox().contains(worldX, worldY)) return true;
+                    if (obs.getHitbox().contains(worldX, worldY))
+                        return true;
                 } else {
                     // Tường/Vật cản thô: check theo bounds ô lưới
                     if (worldX >= obs.x && worldX < obs.x + obs.width &&
-                        worldY >= obs.y && worldY < obs.y + obs.height) return true;
+                            worldY >= obs.y && worldY < obs.y + obs.height)
+                        return true;
                 }
             }
         }
@@ -419,8 +428,10 @@ public class MapManager {
     private boolean isAreaClear(int[][] mask, int startR, int startC, int h, int w) {
         for (int r = startR; r < startR + h; r++) {
             for (int c = startC; c < startC + w; c++) {
-                if (r < 0 || r >= rows || c < 0 || c >= cols) return false;
-                if (mask[r][c] != 0) return false;
+                if (r < 0 || r >= rows || c < 0 || c >= cols)
+                    return false;
+                if (mask[r][c] != 0)
+                    return false;
             }
         }
         return true;

@@ -24,6 +24,7 @@ public class EntityManager {
 
     private long lastEnemySpawnTime;
     public int waveCount = 0;
+    public int activeBossCount = 0; // Cập nhật an toàn để tránh crash music
     private long currentSpawnInterval = 10000;
 
     public void startNewGame(long currentTime, int startingWave) {
@@ -31,6 +32,7 @@ public class EntityManager {
         projectiles.clear();
         heartDrops.clear();
         weaponChests.clear();
+        activeBossCount = 0;
         synchronized (resourceDrops) {
             resourceDrops.clear();
         }
@@ -42,6 +44,14 @@ public class EntityManager {
 
     public void update(Player player, VFXManager vfxManager, List<PassiveSkill> activeSkills,
             int screenWidth, int screenHeight, long currentTime, int surviveTimeSeconds, GamePanel panel) {
+
+        // Đếm boss đang hoạt động (không dùng stream để tránh ConcurrentModificationException)
+        int bCount = 0;
+        for (Enemy e : enemies) {
+            if (e.isBoss && !e.isDying)
+                bCount++;
+        }
+        activeBossCount = bCount;
 
         // 1. SINH QUÁI VÀ BOSS
         if (enemies.isEmpty() || currentTime - lastEnemySpawnTime >= currentSpawnInterval) {
@@ -95,7 +105,7 @@ public class EntityManager {
                 if (obs.isDestroyed() && obs instanceof gameproject.environment.WoodenCrate) {
                     synchronized (resourceDrops) {
                         // WoodenCrates drop 2-5 gold and 5% chance for a soul
-                        int goldToDrop = 2 + (int)(Math.random() * 4);
+                        int goldToDrop = 2 + (int) (Math.random() * 4);
                         spawnResource(p.getX(), p.getY(), ResourceDrop.Type.GOLD, goldToDrop, currentTime, 15000);
                         if (Math.random() < 0.05) {
                             spawnResource(p.getX(), p.getY(), ResourceDrop.Type.SOUL, 1, currentTime, 30000);
@@ -155,11 +165,29 @@ public class EntityManager {
                         float endX = p.startX + dirX * p.maxRange;
                         float endY = p.startY + dirY * p.maxRange;
 
-                        vfxManager.addLaser(p.startX, p.startY, endX, endY, currentTime);
+                        // --- Railgun Environment Interaction ---
+                        float currentEndX = endX;
+                        float currentEndY = endY;
+                        
+                        // Check for obstacles along the beam path
+                        int steps = 20; 
+                        for (int s = 0; s <= steps; s++) {
+                            float checkX = p.startX + (dirX * p.maxRange * s / steps);
+                            float checkY = p.startY + (dirY * p.maxRange * s / steps);
+                            gameproject.environment.Obstacle wallObs = panel.mapManager.getObstacleAtWorld(checkX, checkY);
+                            if (wallObs != null && wallObs.isSolid()) {
+                                currentEndX = checkX;
+                                currentEndY = checkY;
+                                wallObs.takeDamage(p.damage); 
+                                break;
+                            }
+                        }
+
+                        vfxManager.addLaser(p.startX, p.startY, currentEndX, currentEndY, currentTime);
 
                         for (Enemy e : enemies) {
                             if (!e.isDead() && distanceToLineSegment(e.getX() + e.size / 2, e.getY() + e.size / 2,
-                                    p.startX, p.startY, endX, endY) <= 40) {
+                                    p.startX, p.startY, currentEndX, currentEndY) <= 40) {
                                 // Khi crit: bỏ qua white text (null vfxManager), chỉ hiện gold text
                                 e.takeDamage(p.damage, p.isCrit ? null : vfxManager, currentTime);
                                 if (p.isCrit) {
@@ -221,99 +249,94 @@ public class EntityManager {
 
         // 4. XỬ LÝ QUÁI VẬT DI CHUYỂN, BẮN ĐẠN VÀ VA CHẠM
         float speedMultiplier = 1.0f + (surviveTimeSeconds / 60) * 0.12f;
-        // Duyệt qua bản sao để tránh ConcurrentModificationException
-        for (Enemy enemy : new ArrayList<>(enemies)) {
+        synchronized (enemies) {
+            // Duyệt qua bản sao để tránh ConcurrentModificationException khi đang loop
+            for (Enemy enemy : new ArrayList<>(enemies)) {
 
-            // Qu\u00e1i \u0111ang trong death fade \u2014 b\u1ecf qua to\u00e0n b\u1ed9
-            // logic, ch\u1ec9 ch\u1edd shouldRemove()
-            if (enemy.isDying) {
-                if (enemy.shouldRemove()) {
-                    panel.addScoreAndExp(enemy.getMaxHp());
-                    SoundManager.play("hit");
-                    vfxManager.spawnDeathParticles(enemy.getX() + enemy.size / 2f,
-                            enemy.getY() + enemy.size / 2f, currentTime,
-                            enemy.isBoss ? new java.awt.Color(255, 80, 80) : enemy.color);
+                if (enemy.isDying) {
+                    if (enemy.shouldRemove()) {
+                        panel.addScoreAndExp(enemy.getMaxHp());
+                        SoundManager.play("hit");
+                        vfxManager.spawnDeathParticles(enemy.getX() + enemy.size / 2f,
+                                enemy.getY() + enemy.size / 2f, currentTime,
+                                enemy.isBoss ? new java.awt.Color(255, 80, 80) : enemy.color);
 
-                    if (enemy.isBoss) {
-                        bossesKilled++;
-                        boolean isRare = (bossesKilled == 1);
-                        weaponChests.add(new ChestDrop(enemy.getX(), enemy.getY(), isRare, currentTime + 300000)); // Hết hạn sau 5 phút
-                    }
-                    if (enemy.isBoss) {
-                        // Scaled Boss Rewards: 100-200 gold and souls based on wave
-                        int goldAmount = 100 + (waveCount / 5) * 50;
-                        int soulAmount = 1 + (waveCount / 5) * 2;
-                        
-                        synchronized (resourceDrops) {
-                            spawnResource(enemy.getX(), enemy.getY(), ResourceDrop.Type.GOLD, goldAmount, currentTime, 45000);
-                            spawnResource(enemy.getX(), enemy.getY(), ResourceDrop.Type.SOUL, soulAmount, currentTime, 60000);
+                        if (enemy.isBoss) {
+                            bossesKilled++;
+                            boolean isRare = (bossesKilled == 1);
+                            weaponChests.add(new ChestDrop(enemy.getX(), enemy.getY(), isRare, currentTime + 300000));
                         }
-                    } else {
-                        if (Math.random() < 0.25) {
+                        if (enemy.isBoss) {
+                            int goldAmount = 100 + (waveCount / 5) * 50;
+                            int soulAmount = 1 + (waveCount / 5) * 2;
                             synchronized (resourceDrops) {
-                                spawnResource(enemy.getX(), enemy.getY(), ResourceDrop.Type.GOLD, 1, currentTime, 20000);
+                                spawnResource(enemy.getX(), enemy.getY(), ResourceDrop.Type.GOLD, goldAmount, currentTime,
+                                        45000);
+                                spawnResource(enemy.getX(), enemy.getY(), ResourceDrop.Type.SOUL, soulAmount, currentTime,
+                                        60000);
+                            }
+                        } else {
+                            if (Math.random() < 0.25) {
+                                synchronized (resourceDrops) {
+                                    spawnResource(enemy.getX(), enemy.getY(), ResourceDrop.Type.GOLD, 1, currentTime, 20000);
+                                }
                             }
                         }
+                        if (enemy.triggerCorrosiveMelt) {
+                            vfxManager.addAcidZone(enemy.getX(), enemy.getY(), 80, currentTime);
+                        }
+                        if (!enemy.isBoss && Math.random() < 0.01) {
+                            heartDrops.add(new HeartDrop(enemy.getX(), enemy.getY(), currentTime + 10000));
+                        } else if (enemy.isBoss) {
+                            heartDrops.add(new HeartDrop(enemy.getX(), enemy.getY(), currentTime + 20000));
+                            heartDrops.add(new HeartDrop(enemy.getX() + 30, enemy.getY(), currentTime + 20000));
+                        }
+                        for (PassiveSkill skill : activeSkills) {
+                            skill.onEnemyDeath(enemy, player, enemies, vfxManager, currentTime);
+                        }
+                        enemies.remove(enemy);
                     }
-                    if (enemy.triggerCorrosiveMelt) {
-                        vfxManager.addAcidZone(enemy.getX(), enemy.getY(), 80, currentTime);
-                    }
-                    if (!enemy.isBoss && Math.random() < 0.02) {
-                        heartDrops.add(new HeartDrop(enemy.getX(), enemy.getY(), currentTime + 10000));
-                    } else if (enemy.isBoss) {
-                        heartDrops.add(new HeartDrop(enemy.getX(), enemy.getY(), currentTime + 20000));
-                        heartDrops.add(new HeartDrop(enemy.getX() + 30, enemy.getY(), currentTime + 20000));
-                    }
-                    for (PassiveSkill skill : activeSkills) {
-                        skill.onEnemyDeath(enemy, player, enemies, vfxManager, currentTime);
-                    }
-                    enemies.remove(enemy);
+                    continue;
                 }
-                continue; // B\u1ecf qua m\u1ecdi logic c\u00f2n l\u1ea1i trong v\u00f2ng l\u1eb7p
-            }
 
-            float currentEnemySpeedMulti = speedMultiplier;
-            if (enemy.chillEndTime > currentTime)
-                currentEnemySpeedMulti *= 0.7f;
-            if (enemy.inAcidZone)
-                currentEnemySpeedMulti *= 0.5f;
+                float currentEnemySpeedMulti = speedMultiplier;
+                if (enemy.chillEndTime > currentTime)
+                    currentEnemySpeedMulti *= 0.7f;
+                if (enemy.inAcidZone)
+                    currentEnemySpeedMulti *= 0.5f;
 
-            enemy.playerDamageCache = panel.upgradeManager.playerDamage;
-            enemy.updateStatusEffects(currentTime, vfxManager);
-            enemy.inAcidZone = false;
+                enemy.playerDamageCache = panel.upgradeManager.playerDamage;
+                enemy.updateStatusEffects(currentTime, vfxManager);
+                enemy.inAcidZone = false;
 
-            if (enemy.freezeEndTime <= currentTime) {
-                enemy.update(player.getX(), player.getY(), currentEnemySpeedMulti, enemies, GamePanel.WORLD_WIDTH,
-                        GamePanel.WORLD_HEIGHT, panel);
-            }
-
-            // Gom đạn do quái bắn ra (nếu có)
-            java.util.List<Projectile> enemyProjs = enemy.shoot();
-            if (enemyProjs != null) {
-                newEnemyProjectiles.addAll(enemyProjs);
-            }
-
-            // Gom quái do Boss triệu hồi (nếu có)
-            java.util.List<Enemy> summoned = enemy.summon();
-            if (summoned != null) {
-                newEnemies.addAll(summoned);
-            }
-
-            // Quái va chạm trực tiếp với Player
-            if (!player.isDashing() && !player.isInvulnerable() && player.getBounds().intersects(enemy.getBounds())
-                    && !enemy.isDying) {
-                if (player.takeHit()) {
-                    panel.triggerGameOver();
-                } else {
-                    vfxManager.triggerScreenShake(15);
-                    vfxManager.triggerPlayerDamageFlash(currentTime);
-                    for (Enemy e : enemies)
-                        e.applyKnockback(player.getX(), player.getY(), 40f);
+                if (enemy.freezeEndTime <= currentTime) {
+                    enemy.update(player.getX(), player.getY(), currentEnemySpeedMulti, enemies, GamePanel.WORLD_WIDTH,
+                            GamePanel.WORLD_HEIGHT, panel);
                 }
-                break;
-            }
 
-            // isDying quản lý ở đầu vòng lặp với continue, nên không cần check thêm ở đây
+                java.util.List<Projectile> enemyProjs = enemy.shoot();
+                if (enemyProjs != null) {
+                    newEnemyProjectiles.addAll(enemyProjs);
+                }
+
+                java.util.List<Enemy> summoned = enemy.summon();
+                if (summoned != null) {
+                    newEnemies.addAll(summoned);
+                }
+
+                if (!player.isDashing() && !player.isInvulnerable() && player.getBounds().intersects(enemy.getBounds())
+                        && !enemy.isDying) {
+                    if (player.takeHit()) {
+                        panel.triggerGameOver();
+                    } else {
+                        vfxManager.triggerScreenShake(15);
+                        vfxManager.triggerPlayerDamageFlash(currentTime);
+                        for (Enemy e : enemies)
+                            e.applyKnockback(player.getX(), player.getY(), 40f);
+                    }
+                    break;
+                }
+            }
         }
         // Đưa toàn bộ đạn mới của địch vào luồng đạn chính
         synchronized (projectiles) {
@@ -457,14 +480,16 @@ public class EntityManager {
     private Enemy getClosestEnemy(Enemy source, ArrayList<Enemy> allEnemies, float maxDist) {
         Enemy closest = null;
         float minDist = maxDist;
-        for (Enemy other : allEnemies) {
-            if (other == source || other.isDead())
-                continue;
-            float dist = (float) Math
-                    .sqrt(Math.pow(other.getX() - source.getX(), 2) + Math.pow(other.getY() - source.getY(), 2));
-            if (dist < minDist) {
-                minDist = dist;
-                closest = other;
+        synchronized (allEnemies) {
+            for (Enemy other : allEnemies) {
+                if (other == source || other.isDead())
+                    continue;
+                float dist = (float) Math
+                        .sqrt(Math.pow(other.getX() - source.getX(), 2) + Math.pow(other.getY() - source.getY(), 2));
+                if (dist < minDist) {
+                    minDist = dist;
+                    closest = other;
+                }
             }
         }
         return closest;

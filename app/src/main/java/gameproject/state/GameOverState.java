@@ -39,6 +39,21 @@ public class GameOverState implements State {
         if (game.input.rPressed) {
             game.input.clearClickAndKey();
             game.startNewGame();
+            return;
+        }
+
+        // Tọa độ nút Quay lại (Góc trên trái)
+        int btnX = 25;
+        int btnY = 25;
+        int btnW = 110;
+        int btnH = 45;
+
+        if (game.input.mouseClicked) {
+            if (game.input.mouseX >= btnX && game.input.mouseX <= btnX + btnW &&
+                game.input.mouseY >= btnY && game.input.mouseY <= btnY + btnH) {
+                game.input.clearClickAndKey();
+                game.changeState(new MenuState());
+            }
         }
     }
 
@@ -50,6 +65,28 @@ public class GameOverState implements State {
         // Nền tối mờ
         g.setColor(new Color(0, 0, 0, 220));
         g.fillRect(0, 0, game.screenWidth, game.screenHeight);
+
+        // --- NÚT QUAY LẠI (Góc trên trái) ---
+        int btnX = 25;
+        int btnY = 25;
+        int btnW = 110;
+        int btnH = 45;
+
+        boolean isHover = game.input.mouseX >= btnX && game.input.mouseX <= btnX + btnW &&
+                          game.input.mouseY >= btnY && game.input.mouseY <= btnY + btnH;
+        
+        g.setColor(isHover ? new Color(120, 120, 120, 200) : new Color(60, 60, 60, 160));
+        g.fillRoundRect(btnX, btnY, btnW, btnH, 12, 12);
+        g.setColor(isHover ? Color.WHITE : Color.LIGHT_GRAY);
+        g.drawRoundRect(btnX, btnY, btnW, btnH, 12, 12);
+
+        // Vẽ hình tam giác
+        int[] tx = { btnX + 12, btnX + 28, btnX + 28 };
+        int[] ty = { btnY + 22, btnY + 12, btnY + 32 };
+        g.fillPolygon(tx, ty, 3);
+
+        g.setFont(FontManager.getFont(18f));
+        g.drawString("MENU", btnX + 38, btnY + 28);
 
         // --- GAME OVER ---
         g.setColor(Color.RED);
@@ -101,11 +138,11 @@ public class GameOverState implements State {
         g.setColor(new Color(255, 255, 255, 60));
         g.fillRect(cx - 350, bottomSepY, 700, 2);
 
-        // --- Gợi ý restart ---
+        // --- Nút Restart (Text Hint) ---
         g.setFont(FontManager.getFont(28f));
         g.setColor(Color.LIGHT_GRAY);
         String hint = "Press  'R'  to Restart";
         int hw = g.getFontMetrics().stringWidth(hint);
-        g.drawString(hint, cx - hw / 2, bottomSepY + 50);
+        g.drawString(hint, cx - hw / 2, bottomSepY + 60);
     }
 }
