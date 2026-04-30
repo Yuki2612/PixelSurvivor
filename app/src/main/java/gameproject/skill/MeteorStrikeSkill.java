@@ -15,7 +15,7 @@ public class MeteorStrikeSkill implements PassiveSkill {
     public void update(Player player, ArrayList<Enemy> enemies, VFXManager vfxManager, long currentTime) {
         int level = player.getBreakthroughLevel(Upgrade.METEOR_STRIKE);
         if (level > 0) {
-            long cooldown = Math.max(500, 3500 - (level * 300));
+            long cooldown = Math.max(500, 5000 - (level * 300));
             if (currentTime - lastStrikeTime > cooldown) {
                 lastStrikeTime = currentTime;
 
@@ -28,8 +28,9 @@ public class MeteorStrikeSkill implements PassiveSkill {
                     targetY = e.getY();
                 }
 
-                int radius = 60 + level * 10;
-                int damage = 20 + level * 10;
+                float soulMulti = 1.0f + (gameproject.meta.PlayerData.skillSoulLevels.getOrDefault(Upgrade.METEOR_STRIKE, 0) * 0.05f);
+                int radius = (int)((50 + level * 10) * soulMulti);
+                int damage = (int)((10 + level * 5) * soulMulti);
 
                 vfxManager.addExplosion(targetX, targetY, radius, currentTime);
                 gameproject.SoundManager.play("explosion");

@@ -21,10 +21,11 @@ public class TrailOfFireSkill implements PassiveSkill {
         // BẮT BUỘC SỬA TẠI ĐÂY: GỌI ĐÍCH DANH VFXManager.FireZone
         for (VFXManager.FireZone fz : vfxManager.fireZones) {
             if (!fz.isExplosion) {
+                float soulMulti = 1.0f + (gameproject.meta.PlayerData.skillSoulLevels.getOrDefault(Upgrade.TRAIL_OF_FIRE, 0) * 0.05f);
                 Rectangle fzHitbox = new Rectangle((int) fz.x, (int) fz.y, 20, 20);
                 for (Enemy e : enemies) {
                     if (e.getBounds().intersects(fzHitbox)) {
-                        e.applyBurn(2000, vfxManager);
+                        e.applyBurn((int)(2000 * soulMulti), vfxManager);
                     }
                 }
             }

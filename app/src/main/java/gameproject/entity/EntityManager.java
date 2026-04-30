@@ -19,6 +19,7 @@ public class EntityManager {
     public ArrayList<Projectile> projectiles = new ArrayList<>();
     public ArrayList<HeartDrop> heartDrops = new ArrayList<>();
     public ArrayList<ChestDrop> weaponChests = new ArrayList<>();
+    public ArrayList<ResourceDrop> resourceDrops = new ArrayList<>();
     public int bossesKilled = 0;
 
     private long lastEnemySpawnTime;
@@ -30,6 +31,9 @@ public class EntityManager {
         projectiles.clear();
         heartDrops.clear();
         weaponChests.clear();
+        synchronized (resourceDrops) {
+            resourceDrops.clear();
+        }
         bossesKilled = 0;
         waveCount = startingWave - 1;
         currentSpawnInterval = 10000;
@@ -49,13 +53,17 @@ public class EntityManager {
 
             if (waveCount % 5 == 0) {
                 int bType = (waveCount / 5) % 3;
-                if (bType == 0) bType = 3;
+                if (bType == 0)
+                    bType = 3;
                 float bossStartX = panel.cameraX + screenWidth / 2f;
                 float bossStartY = panel.cameraY - 100f; // Boss tới từ phía trên camera
 
-                if (bType == 1)      enemies.add(new ChargerBoss(bossStartX, bossStartY, surviveTimeSeconds));
-                else if (bType == 2) enemies.add(new TeleporterBoss(bossStartX, bossStartY, surviveTimeSeconds));
-                else                 enemies.add(new TankBoss(bossStartX, bossStartY, surviveTimeSeconds));
+                if (bType == 1)
+                    enemies.add(new ChargerBoss(bossStartX, bossStartY, surviveTimeSeconds));
+                else if (bType == 2)
+                    enemies.add(new TeleporterBoss(bossStartX, bossStartY, surviveTimeSeconds));
+                else
+                    enemies.add(new TankBoss(bossStartX, bossStartY, surviveTimeSeconds));
 
                 vfxManager.showWaveBanner("⚠  BOSS INCOMING!", new java.awt.Color(255, 80, 80), currentTime);
             } else {
@@ -79,6 +87,27 @@ public class EntityManager {
         while (pIt.hasNext()) {
             Projectile p = pIt.next();
             p.update(GamePanel.WORLD_WIDTH, GamePanel.WORLD_HEIGHT);
+
+            // THÊM: Va chạm với vật cản trên Map (Tường/Thùng gỗ)
+            gameproject.environment.Obstacle obs = panel.mapManager.getObstacleAtWorld(p.getX(), p.getY());
+            if (obs != null && obs.isSolid()) {
+                obs.takeDamage(p.damage);
+                if (obs.isDestroyed() && obs instanceof gameproject.environment.WoodenCrate) {
+                    synchronized (resourceDrops) {
+                        // WoodenCrates drop 2-5 gold and 5% chance for a soul
+                        int goldToDrop = 2 + (int)(Math.random() * 4);
+                        spawnResource(p.getX(), p.getY(), ResourceDrop.Type.GOLD, goldToDrop, currentTime, 15000);
+                        if (Math.random() < 0.05) {
+                            spawnResource(p.getX(), p.getY(), ResourceDrop.Type.SOUL, 1, currentTime, 30000);
+                        }
+                    }
+                }
+                p.setActive(false);
+                // Nếu đạn nổ của địch trúng tường, cho nổ luôn
+                if (p.isEnemyBullet && p.isExplosive) {
+                    handleExplosiveEnemyBullet(p, player, vfxManager, currentTime, panel);
+                }
+            }
 
             // Kiểm tra đạn nổ của địch khi hết tầm bay
             if (!p.isActive() && p.isEnemyBullet && p.isExplosive) {
@@ -117,18 +146,20 @@ public class EntityManager {
                         p.bouncesLeft = 0;
                         float dx = p.speedX;
                         float dy = p.speedY;
-                        float len = (float)Math.sqrt(dx*dx + dy*dy);
-                        if (len == 0) len = 1;
+                        float len = (float) Math.sqrt(dx * dx + dy * dy);
+                        if (len == 0)
+                            len = 1;
                         float dirX = dx / len;
                         float dirY = dy / len;
-                        
+
                         float endX = p.startX + dirX * p.maxRange;
                         float endY = p.startY + dirY * p.maxRange;
-                        
+
                         vfxManager.addLaser(p.startX, p.startY, endX, endY, currentTime);
-                        
+
                         for (Enemy e : enemies) {
-                            if (!e.isDead() && distanceToLineSegment(e.getX() + e.size/2, e.getY() + e.size/2, p.startX, p.startY, endX, endY) <= 40) {
+                            if (!e.isDead() && distanceToLineSegment(e.getX() + e.size / 2, e.getY() + e.size / 2,
+                                    p.startX, p.startY, endX, endY) <= 40) {
                                 // Khi crit: bỏ qua white text (null vfxManager), chỉ hiện gold text
                                 e.takeDamage(p.damage, p.isCrit ? null : vfxManager, currentTime);
                                 if (p.isCrit) {
@@ -153,9 +184,13 @@ public class EntityManager {
                             p.setActive(false);
 
                             if (p.bouncesLeft > 0) {
-                                float soulMulti = 1.0f + (gameproject.meta.PlayerData.skillSoulLevels.getOrDefault(gameproject.skill.Upgrade.CHAIN_LIGHTNING, 0) * 0.05f);
+                                float soulMulti = 1.0f + (gameproject.meta.PlayerData.skillSoulLevels
+                                        .getOrDefault(gameproject.skill.Upgrade.CHAIN_LIGHTNING, 0) * 0.05f);
                                 // Chain Lightning Range (Lv1: 250px Lv5: 650px)
-                                float maxRange = (150.0f + (player.getBreakthroughLevel(gameproject.skill.Upgrade.CHAIN_LIGHTNING) * 100)) * soulMulti;
+                                float maxRange = (150.0f
+                                        + (player.getBreakthroughLevel(gameproject.skill.Upgrade.CHAIN_LIGHTNING)
+                                                * 100))
+                                        * soulMulti;
                                 Enemy closest = getClosestEnemy(e, enemies, maxRange);
                                 if (closest != null) {
                                     Projectile bounceProj = new Projectile(e.getX(), e.getY(), closest.getX(),
@@ -163,8 +198,10 @@ public class EntityManager {
                                             1.5f, 300f);
                                     bounceProj.isShocking = true;
                                     bounceProj.damage = (int) ((Math.max(1, p.damage / 5)
-                                            // Lv1: +4  Lv5: +20
-                                            + (player.getBreakthroughLevel(gameproject.skill.Upgrade.CHAIN_LIGHTNING) * 4)) * soulMulti);
+                                            // Lv1: +4 Lv5: +20
+                                            + (player.getBreakthroughLevel(gameproject.skill.Upgrade.CHAIN_LIGHTNING)
+                                                    * 4))
+                                            * soulMulti);
                                     bounceProj.bouncesLeft = p.bouncesLeft - 1;
                                     bounceProj.ignoredEnemy = e;
                                     pendingProjectiles.add(bounceProj);
@@ -184,11 +221,11 @@ public class EntityManager {
 
         // 4. XỬ LÝ QUÁI VẬT DI CHUYỂN, BẮN ĐẠN VÀ VA CHẠM
         float speedMultiplier = 1.0f + (surviveTimeSeconds / 60) * 0.12f;
-        Iterator<Enemy> eIt = enemies.iterator();
-        while (eIt.hasNext()) {
-            Enemy enemy = eIt.next();
+        // Duyệt qua bản sao để tránh ConcurrentModificationException
+        for (Enemy enemy : new ArrayList<>(enemies)) {
 
-            // Qu\u00e1i \u0111ang trong death fade \u2014 b\u1ecf qua to\u00e0n b\u1ed9 logic, ch\u1ec9 ch\u1edd shouldRemove()
+            // Qu\u00e1i \u0111ang trong death fade \u2014 b\u1ecf qua to\u00e0n b\u1ed9
+            // logic, ch\u1ec9 ch\u1edd shouldRemove()
             if (enemy.isDying) {
                 if (enemy.shouldRemove()) {
                     panel.addScoreAndExp(enemy.getMaxHp());
@@ -203,10 +240,20 @@ public class EntityManager {
                         weaponChests.add(new ChestDrop(enemy.getX(), enemy.getY(), isRare, currentTime + 300000)); // Hết hạn sau 5 phút
                     }
                     if (enemy.isBoss) {
-                        PlayerData.gold += 50;
-                        PlayerData.soulStones += 1;
+                        // Scaled Boss Rewards: 100-200 gold and souls based on wave
+                        int goldAmount = 100 + (waveCount / 5) * 50;
+                        int soulAmount = 1 + (waveCount / 5) * 2;
+                        
+                        synchronized (resourceDrops) {
+                            spawnResource(enemy.getX(), enemy.getY(), ResourceDrop.Type.GOLD, goldAmount, currentTime, 45000);
+                            spawnResource(enemy.getX(), enemy.getY(), ResourceDrop.Type.SOUL, soulAmount, currentTime, 60000);
+                        }
                     } else {
-                        if (Math.random() < 0.2) PlayerData.gold += 1;
+                        if (Math.random() < 0.25) {
+                            synchronized (resourceDrops) {
+                                spawnResource(enemy.getX(), enemy.getY(), ResourceDrop.Type.GOLD, 1, currentTime, 20000);
+                            }
+                        }
                     }
                     if (enemy.triggerCorrosiveMelt) {
                         vfxManager.addAcidZone(enemy.getX(), enemy.getY(), 80, currentTime);
@@ -220,21 +267,24 @@ public class EntityManager {
                     for (PassiveSkill skill : activeSkills) {
                         skill.onEnemyDeath(enemy, player, enemies, vfxManager, currentTime);
                     }
-                    eIt.remove();
+                    enemies.remove(enemy);
                 }
                 continue; // B\u1ecf qua m\u1ecdi logic c\u00f2n l\u1ea1i trong v\u00f2ng l\u1eb7p
             }
 
             float currentEnemySpeedMulti = speedMultiplier;
-            if (enemy.chillEndTime > currentTime) currentEnemySpeedMulti *= 0.7f;
-            if (enemy.inAcidZone) currentEnemySpeedMulti *= 0.5f;
+            if (enemy.chillEndTime > currentTime)
+                currentEnemySpeedMulti *= 0.7f;
+            if (enemy.inAcidZone)
+                currentEnemySpeedMulti *= 0.5f;
 
             enemy.playerDamageCache = panel.upgradeManager.playerDamage;
             enemy.updateStatusEffects(currentTime, vfxManager);
             enemy.inAcidZone = false;
 
             if (enemy.freezeEndTime <= currentTime) {
-                enemy.update(player.getX(), player.getY(), currentEnemySpeedMulti, enemies, GamePanel.WORLD_WIDTH, GamePanel.WORLD_HEIGHT);
+                enemy.update(player.getX(), player.getY(), currentEnemySpeedMulti, enemies, GamePanel.WORLD_WIDTH,
+                        GamePanel.WORLD_HEIGHT, panel);
             }
 
             // Gom đạn do quái bắn ra (nếu có)
@@ -250,7 +300,8 @@ public class EntityManager {
             }
 
             // Quái va chạm trực tiếp với Player
-            if (!player.isDashing() && !player.isInvulnerable() && player.getBounds().intersects(enemy.getBounds()) && !enemy.isDying) {
+            if (!player.isDashing() && !player.isInvulnerable() && player.getBounds().intersects(enemy.getBounds())
+                    && !enemy.isDying) {
                 if (player.takeHit()) {
                     panel.triggerGameOver();
                 } else {
@@ -265,8 +316,30 @@ public class EntityManager {
             // isDying quản lý ở đầu vòng lặp với continue, nên không cần check thêm ở đây
         }
         // Đưa toàn bộ đạn mới của địch vào luồng đạn chính
-        projectiles.addAll(newEnemyProjectiles);
-        enemies.addAll(newEnemies);
+        synchronized (projectiles) {
+            projectiles.addAll(newEnemyProjectiles);
+        }
+        synchronized (enemies) {
+            enemies.addAll(newEnemies);
+        }
+
+        // XỬ LÝ VẬT PHẨM (RESOURCE DROPS)
+        synchronized (resourceDrops) {
+            Iterator<ResourceDrop> rdIt = resourceDrops.iterator();
+            while (rdIt.hasNext()) {
+                ResourceDrop rd = rdIt.next();
+                if (currentTime > rd.expireTime) {
+                    rdIt.remove();
+                } else {
+                    rd.update(player.getX() + player.SIZE / 2, player.getY() + player.SIZE / 2);
+                    if (rd.isCollected(player.getX() + player.SIZE / 2, player.getY() + player.SIZE / 2)) {
+                        rd.applyToPlayer();
+                        gameproject.SoundManager.play("pickup");
+                        rdIt.remove();
+                    }
+                }
+            }
+        }
 
         // 5. XỬ LÝ VẬT PHẨM (MÁU, RƯƠNG)
         Iterator<HeartDrop> hIt = heartDrops.iterator();
@@ -329,31 +402,39 @@ public class EntityManager {
     private Enemy spawnSafeEnemy(Player player, GamePanel panel, int surviveTimeSeconds) {
         Random rand = new Random();
         float ex = 0, ey = 0;
-        
+
         float camX = panel.cameraX;
         float camY = panel.cameraY;
         int sw = panel.screenWidth;
         int sh = panel.screenHeight;
 
-        // Spawn ra sát ngoài viền camera
-        int side = rand.nextInt(4);
-        if (side == 0) { // Top
-            ex = camX + rand.nextInt(sw);
-            ey = camY - 50;
-        } else if (side == 1) { // Bottom
-            ex = camX + rand.nextInt(sw);
-            ey = camY + sh + 50;
-        } else if (side == 2) { // Left
-            ex = camX - 50;
-            ey = camY + rand.nextInt(sh);
-        } else { // Right
-            ex = camX + sw + 50;
-            ey = camY + rand.nextInt(sh);
-        }
+        // Thử tìm vị trí an toàn (không vật cản và có đường đi) tối đa 10 lần
+        for (int attempt = 0; attempt < 10; attempt++) {
+            int side = rand.nextInt(4);
+            if (side == 0) { // Top
+                ex = camX + rand.nextInt(sw);
+                ey = camY - 50;
+            } else if (side == 1) { // Bottom
+                ex = camX + rand.nextInt(sw);
+                ey = camY + sh + 50;
+            } else if (side == 2) { // Left
+                ex = camX - 50;
+                ey = camY + rand.nextInt(sh);
+            } else { // Right
+                ex = camX + sw + 50;
+                ey = camY + rand.nextInt(sh);
+            }
 
-        // Clamp inside WORLD
-        ex = Math.max(0, Math.min(ex, GamePanel.WORLD_WIDTH - 30));
-        ey = Math.max(0, Math.min(ey, GamePanel.WORLD_HEIGHT - 30));
+            // Clamp inside WORLD
+            ex = Math.max(0, Math.min(ex, GamePanel.WORLD_WIDTH - 30));
+            ey = Math.max(0, Math.min(ey, GamePanel.WORLD_HEIGHT - 30));
+
+            // Nếu vị trí này có thể đi được, có đường tới Player, và KHÔNG PHẢI cửa, chấp nhận luôn
+            if (panel.mapManager.isNavigable((int) ex + 15, (int) ey + 15)
+                    && !panel.mapManager.isEntrance((int) ex + 15, (int) ey + 15)) {
+                break;
+            }
+        }
 
         int minTier = Math.min(5, (waveCount / 3) + 1);
         int maxTier = Math.min(5, Math.max(minTier, waveCount));
@@ -389,7 +470,7 @@ public class EntityManager {
         return closest;
     }
 
-    public void draw(Graphics g) {
+    public void drawGroundItems(Graphics g) {
         for (ChestDrop chest : weaponChests) {
             java.awt.image.BufferedImage chestImg = gameproject.ImageManager.get(chest.isRare ? "chest2" : "chest1");
             if (chestImg != null) {
@@ -411,18 +492,36 @@ public class EntityManager {
                 g.fillRect((int) hd.x, (int) hd.y, 15, 15);
             }
         }
+
+        synchronized (resourceDrops) {
+            for (ResourceDrop rd : resourceDrops) {
+                rd.draw(g);
+            }
+        }
+    }
+
+    public void drawProjectiles(Graphics g) {
         for (Projectile p : projectiles)
             p.draw(g);
-        for (Enemy enemy : enemies)
-            enemy.draw(g);
     }
 
     private float distanceToLineSegment(float px, float py, float x1, float y1, float x2, float y2) {
-        float l2 = (x2 - x1)*(x2 - x1) + (y2 - y1)*(y2 - y1);
-        if (l2 == 0) return (float)Math.sqrt((px - x1)*(px - x1) + (py - y1)*(py - y1));
-        float t = Math.max(0, Math.min(1, ((px - x1)*(x2 - x1) + (py - y1)*(y2 - y1)) / l2));
+        float l2 = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
+        if (l2 == 0)
+            return (float) Math.sqrt((px - x1) * (px - x1) + (py - y1) * (py - y1));
+        float t = Math.max(0, Math.min(1, ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2));
         float projX = x1 + t * (x2 - x1);
         float projY = y1 + t * (y2 - y1);
-        return (float)Math.sqrt((px - projX)*(px - projX) + (py - projY)*(py - projY));
+        return (float) Math.sqrt((px - projX) * (px - projX) + (py - projY) * (py - projY));
+    }
+
+    private void spawnResource(float x, float y, ResourceDrop.Type type, int amount, long currentTime, long duration) {
+        int cap = (type == ResourceDrop.Type.GOLD) ? 100 : 10;
+        int remaining = amount;
+        while (remaining > 0) {
+            int toSpawn = Math.min(remaining, cap);
+            resourceDrops.add(new ResourceDrop(x, y, type, toSpawn, currentTime + duration));
+            remaining -= toSpawn;
+        }
     }
 }

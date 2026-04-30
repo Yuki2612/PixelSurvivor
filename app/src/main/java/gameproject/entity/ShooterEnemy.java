@@ -57,7 +57,7 @@ public class ShooterEnemy extends Enemy {
 
     @Override
     public void update(float playerX, float playerY, float speedMultiplier, ArrayList<Enemy> allEnemies, int screenW,
-            int screenH) {
+            int screenH, gameproject.GamePanel panel) {
         targetPX = playerX;
         targetPY = playerY;
 
@@ -67,27 +67,8 @@ public class ShooterEnemy extends Enemy {
         float currentSpeed = speed * speedMultiplier;
         float moveX = 0, moveY = 0;
 
-        if (distance < 800 && distance > 0) { // Tầm nhìn xa hơn quái thường
-            moveX = (dx / distance) * currentSpeed;
-            moveY = (dy / distance) * currentSpeed;
-        } else {
-            // Đi về phía player chậm rãi khi ngoài tầm nhìn
-            moveX = (dx / distance) * (currentSpeed * 0.4f);
-            moveY = (dy / distance) * (currentSpeed * 0.4f);
-        }
-
-        for (Enemy other : allEnemies) {
-            if (other == this || other.isBoss)
-                continue;
-            float odx = this.x - other.x;
-            float ody = this.y - other.y;
-            float oDist = (float) Math.sqrt(odx * odx + ody * ody);
-            if (oDist > 0 && oDist < 30) {
-                moveX += (odx / oDist) * 0.8f;
-                moveY += (ody / oDist) * 0.8f;
-            }
-        }
-        applyPhysicsAndBounds(moveX, moveY, screenW, screenH);
+        // Sử dụng bộ não AI tập trung để xử lý di chuyển và va chạm (Sliding Collision)
+        EnemyController.moveEnemy(this, panel, speedMultiplier);
 
         if (currentCooldown > 0)
             currentCooldown--;

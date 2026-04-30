@@ -98,7 +98,7 @@ public class UpgradeManager {
         // 2. Nếu chưa đủ 5 loại đột phá, thêm các loại chưa sở hữu vào danh sách lựa chọn
         if (owned.size() < 5) {
             for (Upgrade u : Upgrade.values()) {
-                if (u.isBreakthrough && !owned.contains(u)) {
+                if (u.isBreakthrough && !owned.contains(u) && gameproject.meta.PlayerData.unlockedSkills.contains(u)) {
                     allValidOptions.add(u);
                 }
             }

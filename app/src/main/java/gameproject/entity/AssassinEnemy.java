@@ -59,7 +59,7 @@ public class AssassinEnemy extends Enemy {
 
     @Override
     public void update(float playerX, float playerY, float speedMultiplier, ArrayList<Enemy> allEnemies, int screenW,
-            int screenH) {
+            int screenH, gameproject.GamePanel panel) {
         // Logic tàng hình
         if (isInvisible) {
             invisTimer--;
@@ -77,30 +77,8 @@ public class AssassinEnemy extends Enemy {
             }
         }
 
-        float dx = playerX - x;
-        float dy = playerY - y;
-        float distance = (float) Math.sqrt(dx * dx + dy * dy);
-        float currentSpeed = speed * speedMultiplier;
-        float moveX = 0, moveY = 0;
-
-        if (distance > 0) {
-            moveX = (dx / distance) * currentSpeed;
-            moveY = (dy / distance) * currentSpeed;
-        }
-
-        // Vẫn tản ra để không đè lên nhau
-        for (Enemy other : allEnemies) {
-            if (other == this || other.isBoss)
-                continue;
-            float odx = this.x - other.x;
-            float ody = this.y - other.y;
-            float oDist = (float) Math.sqrt(odx * odx + ody * ody);
-            if (oDist > 0 && oDist < 30) {
-                moveX += (odx / oDist) * 0.8f;
-                moveY += (ody / oDist) * 0.8f;
-            }
-        }
-        applyPhysicsAndBounds(moveX, moveY, screenW, screenH);
+        // Sử dụng bộ não AI tập trung để xử lý di chuyển và va chạm (Sliding Collision)
+        EnemyController.moveEnemy(this, panel, speedMultiplier);
     }
 
     // Ghi đè takeDamage: Kháng 100% sát thương đạn khi đang tàng hình

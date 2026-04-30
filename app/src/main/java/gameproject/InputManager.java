@@ -14,6 +14,7 @@ public class InputManager implements KeyListener, MouseListener, MouseMotionList
     public boolean mouseClicked = false;
     public boolean escPressed = false;
     public boolean rPressed = false;
+    public boolean showLargeMap = false;
     public String typedKeySequence = "";
 
     private GamePanel game;
@@ -32,6 +33,8 @@ public class InputManager implements KeyListener, MouseListener, MouseMotionList
     public void keyPressed(KeyEvent e) {
         if (e.getKeyCode() == KeyEvent.VK_ESCAPE) escPressed = true;
         if (e.getKeyCode() == KeyEvent.VK_R) rPressed = true;
+        if (e.getKeyCode() == KeyEvent.VK_M) showLargeMap = !showLargeMap;
+        
         if (game.player != null && game.getCurrentState() instanceof PlayingState) {
             game.player.keyPressed(e);
         }

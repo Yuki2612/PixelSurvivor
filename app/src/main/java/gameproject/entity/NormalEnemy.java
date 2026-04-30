@@ -1,6 +1,6 @@
 package gameproject.entity;
 
-//import gameproject.*;
+import gameproject.GamePanel;
 import java.awt.Color;
 import java.awt.Graphics;
 import java.util.ArrayList;
@@ -46,34 +46,15 @@ public class NormalEnemy extends Enemy {
 
     @Override
     public void update(float playerX, float playerY, float speedMultiplier, ArrayList<Enemy> allEnemies, int screenW,
-            int screenH) {
-        float dx = playerX - x;
-        float dy = playerY - y;
-        float distance = (float) Math.sqrt(dx * dx + dy * dy);
-        float currentSpeed = speed * speedMultiplier;
-        float moveX = 0, moveY = 0;
+            int screenH, GamePanel panel) {
+        
+        // Gọi bộ não AI tập trung để xử lý di chuyển và va chạm (Sliding Collision)
+        EnemyController.moveEnemy(this, panel, speedMultiplier);
 
-        if (distance < 300 && distance > 0) {
-            moveX = (dx / distance) * currentSpeed;
-            moveY = (dy / distance) * currentSpeed;
-        } else {
-            // Đi về phía player chậm rãi khi ngoài tầm nhìn
-            moveX = (dx / distance) * (currentSpeed * 0.4f);
-            moveY = (dy / distance) * (currentSpeed * 0.4f);
-        }
-
-        for (Enemy other : allEnemies) {
-            if (other == this || other.isBoss)
-                continue;
-            float odx = this.x - other.x;
-            float ody = this.y - other.y;
-            float oDist = (float) Math.sqrt(odx * odx + ody * ody);
-            if (oDist > 0 && oDist < 30) {
-                moveX += (odx / oDist) * 0.8f;
-                moveY += (ody / oDist) * 0.8f;
-            }
-        }
-        applyPhysicsAndBounds(moveX, moveY, screenW, screenH);
+        // AI Phá vật cản (Giữ nguyên tính năng đặc trưng của bạn)
+        float fdx = panel.mapManager.getFlowDirX((int) x + size / 2, (int) y + size / 2);
+        float fdy = panel.mapManager.getFlowDirY((int) x + size / 2, (int) y + size / 2);
+        handleObstacleBreaking(fdx * speed, fdy * speed, panel);
     }
 
     @Override

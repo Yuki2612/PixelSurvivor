@@ -23,7 +23,7 @@ public class TankBoss extends Enemy {
 
     @Override
     public void update(float playerX, float playerY, float speedMultiplier, ArrayList<Enemy> allEnemies, int screenW,
-            int screenH) {
+            int screenH, GamePanel panel) {
         // Kiểm tra ngưỡng máu để triệu hồi
         float hpPercent = (float) hp / maxHp;
         if (hpPercent <= 0.75f && !thresholds[0]) {
@@ -37,16 +37,8 @@ public class TankBoss extends Enemy {
             thresholds[2] = true;
         }
 
-        float dx = playerX - x;
-        float dy = playerY - y;
-        float distance = (float) Math.sqrt(dx * dx + dy * dy);
-        float currentSpeed = speed * speedMultiplier;
-        float moveX = 0, moveY = 0;
-        if (distance > 0) {
-            moveX = (dx / distance) * currentSpeed;
-            moveY = (dy / distance) * currentSpeed;
-        }
-        applyPhysicsAndBounds(moveX, moveY, screenW, screenH);
+        // Điều khiển di chuyển bằng AI tập trung
+        EnemyController.moveEnemy(this, panel, speedMultiplier);
     }
 
     private void triggerSummon() {

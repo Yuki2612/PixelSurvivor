@@ -6,7 +6,6 @@ import gameproject.meta.PlayerData;
 
 public class StatsUI {
     public static void draw(Graphics g, int sw, int sh, String[] names, String[] descs, int[] levels, int[] maxLevels, int gold, Object[] nodes, int mouseX, int mouseY) {
-        if (nodes == null) return;
         Graphics2D g2d = (Graphics2D) g;
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
@@ -18,21 +17,45 @@ public class StatsUI {
         for (int i = 0; i < sw; i += 40) g2d.drawLine(i, 0, i, sh);
         for (int i = 0; i < sh; i += 40) g2d.drawLine(0, i, sw, i);
 
+        if (nodes == null) return;
+
         // Header
         g2d.setColor(Color.WHITE);
         g2d.setFont(FontManager.getFont(45f));
         g2d.drawString("EVOLUTION TREE", sw / 2 - 200, 80);
 
-        // Gold Balance
-        int goldX = sw - 280;
-        int goldY = 50;
-        g2d.setColor(new Color(40, 40, 20));
-        g2d.fillRoundRect(goldX, goldY, 230, 50, 20, 20);
-        g2d.setColor(Color.YELLOW);
-        g2d.setStroke(new BasicStroke(2));
-        g2d.drawRoundRect(goldX, goldY, 230, 50, 20, 20);
-        g2d.setFont(FontManager.getFont(24f));
-        g2d.drawString("💰 " + gold, goldX + 30, goldY + 35);
+        // Resources Balance
+        int resX = sw - 300;
+        int resY = 50;
+        int resW = 250;
+        int resH = 80;
+        
+        g2d.setColor(new Color(20, 20, 30, 240));
+        g2d.fillRoundRect(resX, resY, resW, resH, 20, 20);
+        g2d.setColor(new Color(70, 70, 100));
+        g2d.drawRoundRect(resX, resY, resW, resH, 20, 20);
+
+        java.awt.image.BufferedImage goldImg = gameproject.ImageManager.get("gold");
+        java.awt.image.BufferedImage soulImg = gameproject.ImageManager.get("soul");
+
+        g2d.setFont(FontManager.getFont(20f));
+        if (goldImg != null) {
+            g2d.drawImage(goldImg, resX + 20, resY + 12, 24, 24, null);
+            g2d.setColor(Color.YELLOW);
+            g2d.drawString("" + gold, resX + 55, resY + 32);
+        } else {
+            g2d.setColor(Color.YELLOW);
+            g2d.drawString("G: " + gold, resX + 20, resY + 32);
+        }
+
+        if (soulImg != null) {
+            g2d.drawImage(soulImg, resX + 20, resY + 45, 24, 24, null);
+            g2d.setColor(Color.CYAN);
+            g2d.drawString("" + PlayerData.soulStones, resX + 55, resY + 65);
+        } else {
+            g2d.setColor(Color.CYAN);
+            g2d.drawString("S: " + PlayerData.soulStones, resX + 20, resY + 65);
+        }
 
         // Total Upgrades (for cost calculation logic display if needed)
         int totalUpgrades = 0;
@@ -183,7 +206,7 @@ public class StatsUI {
         } catch(Exception e) { return true; }
     }
     private static int getCost(int idx, int total) {
-        int[] baseCosts = {100, 200, 150, 100, 150, 200};
-        return (int)(baseCosts[idx] * Math.pow(1.1, total));
+        int[] baseCosts = {80, 250, 120, 100, 180, 220};
+        return (int)(baseCosts[idx] * Math.pow(1.06, total));
     }
 }

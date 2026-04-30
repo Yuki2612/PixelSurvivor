@@ -55,7 +55,7 @@ public class CannoneerEnemy extends Enemy {
 
     @Override
     public void update(float playerX, float playerY, float speedMultiplier, ArrayList<Enemy> allEnemies, int screenW,
-            int screenH) {
+            int screenH, gameproject.GamePanel panel) {
         targetPX = playerX;
         targetPY = playerY;
 
@@ -65,27 +65,8 @@ public class CannoneerEnemy extends Enemy {
         float currentSpeed = speed * speedMultiplier;
         float moveX = 0, moveY = 0;
 
-        // Cố gắng giữ khoảng cách an toàn (như RangedEnemy)
-        if (distance > 300) {
-            moveX = (dx / distance) * currentSpeed;
-            moveY = (dy / distance) * currentSpeed;
-        } else if (distance < 200) {
-            moveX = -(dx / distance) * currentSpeed;
-            moveY = -(dy / distance) * currentSpeed;
-        }
-
-        for (Enemy other : allEnemies) {
-            if (other == this || other.isBoss)
-                continue;
-            float odx = this.x - other.x;
-            float ody = this.y - other.y;
-            float oDist = (float) Math.sqrt(odx * odx + ody * ody);
-            if (oDist > 0 && oDist < 40) {
-                moveX += (odx / oDist) * 0.8f;
-                moveY += (ody / oDist) * 0.8f;
-            }
-        }
-        applyPhysicsAndBounds(moveX, moveY, screenW, screenH);
+        // Sử dụng bộ não AI tập trung để xử lý di chuyển và va chạm (Sliding Collision)
+        EnemyController.moveEnemy(this, panel, speedMultiplier);
 
         if (currentCooldown > 0)
             currentCooldown--;

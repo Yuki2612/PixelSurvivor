@@ -1,6 +1,6 @@
 package gameproject.entity;
 
-//import gameproject.*;
+import gameproject.*;
 import java.awt.Color;
 import java.awt.Graphics;
 import java.util.ArrayList;
@@ -21,7 +21,7 @@ public class TeleporterBoss extends Enemy {
 
     @Override
     public void update(float playerX, float playerY, float speedMultiplier, ArrayList<Enemy> allEnemies, int screenW,
-            int screenH) {
+            int screenH, GamePanel panel) {
         actionTimer--;
         if (actionTimer <= 0) {
             actionTimer = 300; // Cooldown dài hơn chút
@@ -54,16 +54,8 @@ public class TeleporterBoss extends Enemy {
             return;
         }
 
-        float dx = playerX - x;
-        float dy = playerY - y;
-        float distance = (float) Math.sqrt(dx * dx + dy * dy);
-        float currentSpeed = speed * speedMultiplier;
-        float moveX = 0, moveY = 0;
-        if (distance > 0) {
-            moveX = (dx / distance) * currentSpeed;
-            moveY = (dy / distance) * currentSpeed;
-        }
-        applyPhysicsAndBounds(moveX, moveY, screenW, screenH);
+        // Sử dụng bộ não AI tập trung
+        EnemyController.moveEnemy(this, panel, speedMultiplier);
     }
 
     @Override

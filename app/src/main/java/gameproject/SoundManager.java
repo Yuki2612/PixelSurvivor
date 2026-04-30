@@ -8,30 +8,24 @@ import java.util.HashMap;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Clip;
+import javax.sound.sampled.FloatControl;
 
 public class SoundManager {
-    // Sử dụng Clip Pool (Danh sách các kênh phát có sẵn) để tránh giới hạn phần
-    // cứng (Line Unavailable)
     private static HashMap<String, Clip[]> clipPool = new HashMap<>();
     private static HashMap<String, Integer> clipIndex = new HashMap<>();
+    private static HashMap<String, Clip> musicPool = new HashMap<>();
+    private static String currentMusicName = null;
+    
+    // Tách biệt âm lượng SFX và Music (0.0f - 1.0f)
+    private static float sfxVolume = 0.8f;
+    private static float musicVolume = 0.6f;
 
     public static void load(String name, String path) {
-        if (clipPool.containsKey(name))
-            return;
+        if (clipPool.containsKey(name)) return;
         try {
-            File file = new File(path);
-            FileInputStream fis = new FileInputStream(file);
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buffer = new byte[4096];
-            int read;
-            while ((read = fis.read(buffer)) != -1) {
-                out.write(buffer, 0, read);
-            }
-            byte[] fileBytes = out.toByteArray();
-            fis.close();
-            out.close();
+            byte[] fileBytes = readFileBytes(path);
+            if (fileBytes == null) return;
 
-            // Cấp phát 15 kênh (Clip) riêng cho tiếng súng, các âm thanh khác dùng 5 kênh
             int poolSize = name.equals("shoot") ? 15 : 10;
             Clip[] clips = new Clip[poolSize];
             for (int i = 0; i < poolSize; i++) {
@@ -42,24 +36,146 @@ public class SoundManager {
             }
             clipPool.put(name, clips);
             clipIndex.put(name, 0);
+        } catch (Exception e) {}
+    }
+
+    public static void loadMusic(String name, String path) {
+        if (musicPool.containsKey(name)) return;
+        try {
+            byte[] fileBytes = readFileBytes(path);
+            if (fileBytes == null) return;
+
+            Clip clip = AudioSystem.getClip();
+            AudioInputStream stream = AudioSystem.getAudioInputStream(new ByteArrayInputStream(fileBytes));
+            clip.open(stream);
+            musicPool.put(name, clip);
+        } catch (Exception e) {}
+    }
+
+    private static byte[] readFileBytes(String path) {
+        try {
+            File file = new File(path);
+            if (!file.exists()) return null;
+            FileInputStream fis = new FileInputStream(file);
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buffer = new byte[4096];
+            int read;
+            while ((read = fis.read(buffer)) != -1) {
+                out.write(buffer, 0, read);
+            }
+            byte[] bytes = out.toByteArray();
+            fis.close();
+            return bytes;
         } catch (Exception e) {
-            System.err.println("LỖI: Không nạp được âm thanh " + name + " tại " + path);
+            return null;
         }
     }
 
     public static void play(String name) {
         Clip[] clips = clipPool.get(name);
-        if (clips == null)
-            return;
+        if (clips == null) return;
 
         int idx = clipIndex.get(name);
         Clip clip = clips[idx];
-
-        // Tua về đầu và phát (những Clip đang phát ở Index khác vẫn sẽ không bị ngắt)
+        setClipVolume(clip, sfxVolume); // Sử dụng âm lượng SFX
         clip.setFramePosition(0);
         clip.start();
-
-        // Xoay vòng Index
         clipIndex.put(name, (idx + 1) % clips.length);
+    }
+
+    public static void playMusic(String name) {
+        if (name == null || name.equals(currentMusicName)) return;
+
+        if (currentMusicName != null) {
+            startFadeOut(currentMusicName, 250); // Fade nhanh hơn (250ms)
+        }
+
+        Clip next = musicPool.get(name);
+        if (next != null) {
+            next.setFramePosition(0);
+            setClipVolume(next, 0.0f);
+            next.loop(Clip.LOOP_CONTINUOUSLY);
+            next.start();
+            currentMusicName = name;
+            startFadeIn(name, 250); // Fade nhanh hơn (250ms)
+        }
+    }
+
+    public static void stopMusic() {
+        if (currentMusicName != null) {
+            Clip clip = musicPool.get(currentMusicName);
+            if (clip != null) clip.stop();
+            currentMusicName = null;
+        }
+    }
+
+    // --- GETTERS & SETTERS ---
+    public static void setSfxVolume(float vol) { sfxVolume = Math.max(0, Math.min(1, vol)); }
+    public static float getSfxVolume() { return sfxVolume; }
+    
+    public static void setMusicVolume(float vol) { 
+        musicVolume = Math.max(0, Math.min(1, vol)); 
+        if (currentMusicName != null) {
+            setClipVolume(musicPool.get(currentMusicName), musicVolume);
+        }
+    }
+    public static float getMusicVolume() { return musicVolume; }
+
+    // --- Hệ thống Fading ---
+    private static void setClipVolume(Clip clip, float vol) {
+        if (clip == null) return;
+        try {
+            if (clip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+                FloatControl gain = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
+                float dB = (float) (Math.log(vol <= 0 ? 0.0001 : vol) / Math.log(10.0) * 20.0);
+                gain.setValue(dB);
+            }
+        } catch (Exception e) {}
+    }
+
+    private static void startFadeIn(String name, int durationMs) {
+        new Thread(() -> {
+            Clip clip = musicPool.get(name);
+            if (clip == null) return;
+            long start = System.currentTimeMillis();
+            while (System.currentTimeMillis() - start < durationMs) {
+                float progress = (float)(System.currentTimeMillis() - start) / durationMs;
+                setClipVolume(clip, progress * musicVolume);
+                try { Thread.sleep(20); } catch (InterruptedException e) {}
+            }
+            setClipVolume(clip, musicVolume);
+        }).start();
+    }
+
+    private static void startFadeOut(String name, int durationMs) {
+        new Thread(() -> {
+            Clip clip = musicPool.get(name);
+            if (clip == null) return;
+            float startVol = musicVolume;
+            long start = System.currentTimeMillis();
+            while (System.currentTimeMillis() - start < durationMs) {
+                float progress = 1.0f - (float)(System.currentTimeMillis() - start) / durationMs;
+                setClipVolume(clip, progress * startVol);
+                try { Thread.sleep(20); } catch (InterruptedException e) {}
+            }
+            clip.stop();
+        }).start();
+    }
+
+    public static void updateLoopFading() {
+        if (currentMusicName == null) return;
+        Clip clip = musicPool.get(currentMusicName);
+        if (clip == null || !clip.isRunning()) return;
+
+        long currentFrame = clip.getFramePosition();
+        long totalFrames = clip.getFrameLength();
+        long framesRemaining = totalFrames - currentFrame;
+        
+        if (framesRemaining < 88200 && framesRemaining > 0) {
+            float vol = (float) framesRemaining / 88200f;
+            setClipVolume(clip, Math.max(0.1f, vol * musicVolume));
+        } else if (currentFrame < 10000) {
+            setClipVolume(clip, musicVolume);
+        }
     }
 }

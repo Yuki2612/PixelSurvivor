@@ -31,16 +31,38 @@ public class SkillsUI {
         g2d.setFont(FontManager.getFont(45f));
         g2d.drawString("SOUL MASTERY", sw / 2 - 180, 80);
         
-        // Soul Stones Display
-        int soulX = sw - 280;
-        int soulY = 50;
-        g2d.setColor(new Color(30, 30, 40));
-        g2d.fillRoundRect(soulX, soulY, 230, 50, 20, 20);
-        g2d.setColor(Color.MAGENTA);
-        g2d.setStroke(new BasicStroke(2));
-        g2d.drawRoundRect(soulX, soulY, 230, 50, 20, 20);
-        g2d.setFont(FontManager.getFont(24f));
-        g2d.drawString("✨ " + PlayerData.soulStones, soulX + 30, soulY + 35);
+        // Resources Balance
+        int resX = sw - 300;
+        int resY = 50;
+        int resW = 250;
+        int resH = 80;
+        
+        g2d.setColor(new Color(20, 20, 30, 240));
+        g2d.fillRoundRect(resX, resY, resW, resH, 20, 20);
+        g2d.setColor(new Color(70, 70, 100));
+        g2d.drawRoundRect(resX, resY, resW, resH, 20, 20);
+
+        java.awt.image.BufferedImage goldImg = gameproject.ImageManager.get("gold");
+        java.awt.image.BufferedImage soulImg = gameproject.ImageManager.get("soul");
+
+        g2d.setFont(FontManager.getFont(20f));
+        if (goldImg != null) {
+            g2d.drawImage(goldImg, resX + 20, resY + 12, 24, 24, null);
+            g2d.setColor(Color.YELLOW);
+            g2d.drawString("" + PlayerData.gold, resX + 55, resY + 32);
+        } else {
+            g2d.setColor(Color.YELLOW);
+            g2d.drawString("G: " + PlayerData.gold, resX + 20, resY + 32);
+        }
+
+        if (soulImg != null) {
+            g2d.drawImage(soulImg, resX + 20, resY + 45, 24, 24, null);
+            g2d.setColor(Color.CYAN);
+            g2d.drawString("" + PlayerData.soulStones, resX + 55, resY + 65);
+        } else {
+            g2d.setColor(Color.CYAN);
+            g2d.drawString("S: " + PlayerData.soulStones, resX + 20, resY + 65);
+        }
 
         // --- Page Indicator ---
         g2d.setColor(Color.GRAY);
@@ -96,10 +118,17 @@ public class SkillsUI {
             g2d.fillRoundRect(x - 5, y - 5, w + 10, h + 10, 25, 25);
         }
 
+        boolean isUnlocked = gameproject.meta.PlayerData.unlockedSkills.contains(u);
+
         // Card Base
-        g2d.setColor(new Color(35, 35, 45));
+        if (isUnlocked) {
+            g2d.setColor(new Color(35, 35, 45));
+        } else {
+            g2d.setColor(new Color(60, 20, 20)); // Red background for locked
+        }
         g2d.fillRoundRect(x, y, w, h, 20, 20);
-        g2d.setColor(hover ? Color.CYAN : new Color(70, 70, 90));
+        
+        g2d.setColor(hover ? Color.CYAN : (isUnlocked ? new Color(70, 70, 90) : new Color(150, 50, 50)));
         g2d.setStroke(new BasicStroke(hover ? 3 : 2));
         g2d.drawRoundRect(x, y, w, h, 20, 20);
 
@@ -115,20 +144,26 @@ public class SkillsUI {
         String name = u.name().replace("_", " ");
         g2d.drawString(name, ix + iconSize + 15, iy + 35);
 
-        // Level Progress Bar
-        int barX = x + 20;
-        int barY = y + 90;
-        int barW = w - 40;
-        int barH = 12;
-        g2d.setColor(Color.BLACK);
-        g2d.fillRoundRect(barX, barY, barW, barH, 5, 5);
-        g2d.setColor(Color.CYAN);
-        int fillW = (int)((float)lv / maxLv * barW);
-        g2d.fillRoundRect(barX, barY, fillW, barH, 5, 5);
-        
-        g2d.setFont(FontManager.getFont(14f));
-        g2d.setColor(new Color(200, 200, 200));
-        g2d.drawString("Efficiency Level: " + lv + "/" + maxLv, barX, barY - 10);
+        if (isUnlocked) {
+            // Level Progress Bar
+            int barX = x + 20;
+            int barY = y + 90;
+            int barW = w - 40;
+            int barH = 12;
+            g2d.setColor(Color.BLACK);
+            g2d.fillRoundRect(barX, barY, barW, barH, 5, 5);
+            g2d.setColor(Color.CYAN);
+            int fillW = (int)((float)lv / maxLv * barW);
+            g2d.fillRoundRect(barX, barY, fillW, barH, 5, 5);
+            
+            g2d.setFont(FontManager.getFont(14f));
+            g2d.setColor(new Color(200, 200, 200));
+            g2d.drawString("Efficiency Level: " + lv + "/" + maxLv, barX, barY - 10);
+        } else {
+            g2d.setFont(FontManager.getFont(16f));
+            g2d.setColor(new Color(255, 100, 100));
+            g2d.drawString("LOCKED", x + 20, y + 105);
+        }
 
         // Upgrade Button
         int btnW = 160;
@@ -136,8 +171,18 @@ public class SkillsUI {
         int btnX = x + w / 2 - btnW / 2;
         int btnY = y + h - 60;
         
-        if (lv < maxLv) {
-            int cost = 50 * (lv + 1);
+        if (!isUnlocked) {
+            int unlockCost = 50;
+            boolean canAfford = PlayerData.soulStones >= unlockCost;
+            g2d.setColor(canAfford ? new Color(100, 50, 0) : new Color(50, 20, 20));
+            g2d.fillRoundRect(btnX, btnY, btnW, btnH, 10, 10);
+            g2d.setColor(canAfford ? Color.ORANGE : Color.GRAY);
+            g2d.drawRoundRect(btnX, btnY, btnW, btnH, 10, 10);
+            g2d.setColor(Color.WHITE);
+            g2d.setFont(FontManager.getFont(18f));
+            g2d.drawString("UNLOCK: " + unlockCost, btnX + 18, btnY + 28);
+        } else if (lv < maxLv) {
+            int cost = 15 * (lv + 1);
             boolean canAfford = PlayerData.soulStones >= cost;
             
             g2d.setColor(canAfford ? new Color(0, 100, 50) : new Color(50, 50, 50));

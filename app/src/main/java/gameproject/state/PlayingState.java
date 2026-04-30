@@ -28,11 +28,12 @@ public class PlayingState implements State {
         int surviveTimeSeconds = (int) ((currentTime - game.startTime) / 1000);
         game.surviveTimeSeconds = surviveTimeSeconds;
 
-        game.player.update(game.screenWidth, game.screenHeight);
+        game.player.update(game);
 
-        // --- CẬP NHẬT CAMERA ---
-        game.cameraX = game.player.getX() - game.screenWidth / 2f + game.player.getBounds().width / 2f;
-        game.cameraY = game.player.getY() - game.screenHeight / 2f + game.player.getBounds().height / 2f;
+        // --- CẬP NHẬT CAMERA (Hoàn trả Snapping - Phản hồi tức thì) ---
+        // Gán trực tiếp nhưng làm tròn số nguyên để camera bám khít nhân vật không độ trễ
+        game.cameraX = Math.round(game.player.getX() - game.screenWidth / 2f + game.player.getBounds().width / 2f);
+        game.cameraY = Math.round(game.player.getY() - game.screenHeight / 2f + game.player.getBounds().height / 2f);
 
         // Giới hạn camera không trượt ra ngoài bản đồ
         if (game.cameraX < 0) game.cameraX = 0;
@@ -62,6 +63,12 @@ public class PlayingState implements State {
             game.input.isMouseHolding = false;
             SoundManager.play("levelup");
             game.changeState(new LevelUpState());
+        }
+
+        // --- CẬP NHẬT MÔI TRƯỜNG ---
+        game.mapManager.update((int) game.player.getX(), (int) game.player.getY());
+        for (gameproject.environment.Building b : game.buildings) {
+            b.update(game.player);
         }
     }
 
@@ -122,7 +129,15 @@ public class PlayingState implements State {
         game.vfxManager.applyScreenShake(g2d);
 
         // DỊCH CHUYỂN CAMERA CHO WORLD RENDERING
-        g2d.translate(-game.cameraX, -game.cameraY);
+        // Translate dựa trên tọa độ camera đã làm tròn để tránh rung hình (jitter)
+        g2d.translate(-Math.round(game.cameraX), -Math.round(game.cameraY));
+
+        // 1. Vẽ Sàn nhà (Nằm dưới mọi vật thể nhưng trên cỏ)
+        synchronized (game.buildings) {
+            for (gameproject.environment.Building b : game.buildings) {
+                b.renderFloor(g2d);
+            }
+        }
 
         for (PassiveSkill skill : game.activeSkills) {
             if (skill instanceof gameproject.skill.FrostAuraSkill || 
@@ -134,23 +149,46 @@ public class PlayingState implements State {
         }
 
         game.vfxManager.draw(g, game.player);
-        game.entityManager.draw(g);
-        game.player.draw(g);
+        
+        // 1. Vẽ vật phẩm dưới đất (Rương, Tim, Soul)
+        game.entityManager.drawGroundItems(g);
+        
+        // 2. --- THUẬT TOÁN Y-SORTING (Z-INDEX) ---
+        // Gom tất cả các đối tượng có độ sâu vào một danh sách
+        java.util.List<gameproject.Renderable> renderList = new java.util.ArrayList<>();
+        renderList.add(game.player);
+        renderList.addAll(game.entityManager.enemies);
+        renderList.addAll(game.mapManager.getAllObstacles());
+        
+        // Sắp xếp theo tọa độ chân (Bottom Y)
+        java.util.Collections.sort(renderList, java.util.Comparator.comparingDouble(gameproject.Renderable::getBottomY));
+        
+        // 3. Vẽ các đối tượng đã được sắp xếp
+        for (gameproject.Renderable r : renderList) {
+            r.render(g2d);
+        }
+
+        // 4. Vẽ các hiệu ứng bay trên cao (Đạn)
+        game.entityManager.drawProjectiles(g);
 
         for (PassiveSkill skill : game.activeSkills) {
             if (skill instanceof gameproject.skill.OrbitingOrbsSkill)
                 skill.draw(g, game.player);
+        }
+        
+        // 5. VẼ MÁI NHÀ (Trên cùng) - Đồng bộ hóa để tránh CME
+        synchronized (game.buildings) {
+            for (gameproject.environment.Building b : game.buildings) {
+                b.renderRoof(g2d);
+            }
         }
 
         // RESET CAMERA TRANSLATION CHO HUD
         g2d.translate(game.cameraX, game.cameraY);
 
         game.vfxManager.resetScreenShake(g2d);
-
-        HUD.draw(g, game.screenWidth, game.screenHeight, game.score, game.entityManager.waveCount,
-                game.upgradeManager.playerDamage, game.currentWeapon.getActualCooldown(), game.player,
-                game.upgradeManager.currentExp, game.upgradeManager.expToNextLevel, game.upgradeManager.playerLevel,
-                game.entityManager.enemies);
+        // --- HUD ---
+        gameproject.ui.HUD.draw(g, game, game.player, game.entityManager.enemies);
 
         // Overlay toàn màn hình (flash đỏ, wave banner) — sau cùng
         long now = System.currentTimeMillis();

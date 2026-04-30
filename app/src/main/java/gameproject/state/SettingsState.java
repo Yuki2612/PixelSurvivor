@@ -7,7 +7,7 @@ import gameproject.FontManager;
 import gameproject.ui.SettingsUI;
 
 public class SettingsState implements State {
-    private boolean pendingReset = false; // Chờ xác nhận reset
+    private boolean pendingReset = false;
     private boolean isAdminMode = false;
     private boolean showAdminInput = false;
 
@@ -24,7 +24,7 @@ public class SettingsState implements State {
 
         if (game.input.escPressed) {
             if (pendingReset) {
-                pendingReset = false; // Hủy xác nhận
+                pendingReset = false;
             } else {
                 game.input.clearClickAndKey();
                 game.changeState(new MenuState());
@@ -34,79 +34,108 @@ public class SettingsState implements State {
             return;
         }
 
+        int sw = game.screenWidth;
+        int sh = game.screenHeight;
+        int mainW = 1150;
+        int mainH = 700;
+        int mainX = sw / 2 - mainW / 2;
+        int mainY = sh / 2 - mainH / 2;
+
         if (game.input.mouseClicked) {
             int mx = game.input.mouseX;
             int my = game.input.mouseY;
 
-            int sw = game.screenWidth;
-            int sh = game.screenHeight;
-            int mainY = sh / 2 - 325;
-
             if (!pendingReset) {
-                // --- Section 1: GENERAL (Damage Numbers) ---
-                int btnX = sw / 2 - 200;
-                int btnY = mainY + 150;
-                if (mx >= btnX && mx <= btnX + 400 && my >= btnY && my <= btnY + 50) {
+                int colY = mainY + 120;
+                int rightX = mainX + 600;
+                int btnW = 420, btnH = 50;
+
+                // --- Section: DISPLAY (Cột Phải) ---
+                // Damage Numbers
+                int t1Y = colY + 50;
+                if (mx >= rightX + 40 && mx <= rightX + 40 + btnW && my >= t1Y && my <= t1Y + btnH) {
                     game.vfxManager.showDamageText = !game.vfxManager.showDamageText;
                 }
+                // Hitboxes
+                int t2Y = colY + 120;
+                if (mx >= rightX + 40 && mx <= rightX + 40 + btnW && my >= t2Y && my <= t2Y + btnH) {
+                    GamePanel.showHitboxes = !GamePanel.showHitboxes;
+                }
 
-                // --- Section 2: ADMIN ---
-                int sec2Y = mainY + 240;
+                // --- Section: ADMIN ---
+                int adminY = colY + 230; // mainY + 350
                 if (isAdminMode) {
-                    int gridX = sw / 2 - 210;
-                    int gridY = sec2Y + 30;
-                    int smallW = 200, smallH = 45;
+                    int cardW = 250, cardH = 80;
+                    int cardX = mainX + 65;
+                    int cardY = adminY + 30; // mainY + 380
+                    int spacing = 20;
 
-                    // Gold
-                    if (mx >= gridX && mx <= gridX + smallW && my >= gridY && my <= gridY + smallH) {
+                    if (mx >= cardX && mx <= cardX + cardW && my >= cardY && my <= cardY + cardH) {
                         gameproject.meta.PlayerData.gold += 1000;
                     }
-                    // Souls
-                    if (mx >= gridX + 220 && mx <= gridX + 220 + smallW && my >= gridY && my <= gridY + smallH) {
+                    if (mx >= cardX + (cardW+spacing) && mx <= cardX + (cardW+spacing) + cardW && my >= cardY && my <= cardY + cardH) {
                         gameproject.meta.PlayerData.soulStones += 100;
                     }
-                    // Wave
-                    if (mx >= gridX && mx <= gridX + smallW && my >= gridY + 60 && my <= gridY + 60 + smallH) {
+                    if (mx >= cardX + (cardW+spacing)*2 && mx <= cardX + (cardW+spacing)*2 + cardW && my >= cardY && my <= cardY + cardH) {
                         gameproject.meta.PlayerData.debugStartWave = (gameproject.meta.PlayerData.debugStartWave % 50) + 1;
                     }
-                    // Level
-                    if (mx >= gridX + 220 && mx <= gridX + 220 + smallW && my >= gridY + 60 && my <= gridY + 60 + smallH) {
+                    if (mx >= cardX + (cardW+spacing)*3 && mx <= cardX + (cardW+spacing)*3 + cardW && my >= cardY && my <= cardY + cardH) {
                         gameproject.meta.PlayerData.debugStartLevel = (gameproject.meta.PlayerData.debugStartLevel % 100) + 1;
                     }
                 } else if (!showAdminInput) {
                     int aBtnX = sw / 2 - 150;
-                    int aBtnY = sec2Y + 40;
+                    int aBtnY = adminY + 40;
                     if (mx >= aBtnX && mx <= aBtnX + 300 && my >= aBtnY && my <= aBtnY + 50) {
                         showAdminInput = true;
                         game.input.typedKeySequence = "";
                     }
                 }
 
-                // --- Section 3: DATA (Reset) ---
-                int rBtnX = sw / 2 - 150;
-                int rBtnY = mainY + 480;
-                if (mx >= rBtnX && mx <= rBtnX + 300 && my >= rBtnY && my <= rBtnY + 50) {
+                // --- Section: DATA ---
+                int dataY = adminY + 160; // mainY + 510
+                int rBtnX = sw / 2 - 200;
+                int rBtnY = dataY + 40; // mainY + 550
+                if (mx >= rBtnX && mx <= rBtnX + 400 && my >= rBtnY && my <= rBtnY + 60) {
                     pendingReset = true;
                 }
-
             } else {
-                int by = sh / 2 - 125;
-                int btnW = 140, btnH = 45;
-                // --- YES ---
-                int yesX = sw / 2 - 160;
-                int yesY = by + 170;
+                int by = sh / 2 - 150;
+                int btnW = 160, btnH = 50;
+                int yesX = sw / 2 - 180;
+                int yesY = by + 210;
                 if (mx >= yesX && mx <= yesX + btnW && my >= yesY && my <= yesY + btnH) {
                     performReset();
                     pendingReset = false;
                 }
-                // --- NO ---
                 int noX = sw / 2 + 20;
                 if (mx >= noX && mx <= noX + btnW && my >= yesY && my <= yesY + btnH) {
                     pendingReset = false;
                 }
             }
-
             game.input.clearClickAndKey();
+        }
+
+        // --- Volume Sliders (Dragging) ---
+        if (game.input.isMouseHolding && !pendingReset) {
+            int mx = game.input.mouseX;
+            int my = game.input.mouseY;
+            
+            int colY = mainY + 120;
+            int leftX = mainX + 50;
+            int sliderW = 420;
+
+            // SFX Slider
+            int s1Y = colY + 60; // mainY + 180
+            if (mx >= leftX + 40 - 20 && mx <= leftX + 40 + sliderW + 20 && my >= s1Y - 30 && my <= s1Y + 40) {
+                float val = (float) (mx - (leftX + 40)) / sliderW;
+                gameproject.SoundManager.setSfxVolume(val);
+            }
+            // Music Slider
+            int s2Y = colY + 140; // mainY + 260
+            if (mx >= leftX + 40 - 20 && mx <= leftX + 40 + sliderW + 20 && my >= s2Y - 30 && my <= s2Y + 40) {
+                float val = (float) (mx - (leftX + 40)) / sliderW;
+                gameproject.SoundManager.setMusicVolume(val);
+            }
         }
     }
 
@@ -128,6 +157,6 @@ public class SettingsState implements State {
     @Override
     public void render(GamePanel game, Graphics g) {
         String inputStr = showAdminInput ? game.input.typedKeySequence : "";
-        SettingsUI.draw(g, game.screenWidth, game.screenHeight, game.vfxManager.showDamageText, pendingReset, isAdminMode, showAdminInput, inputStr);
+        SettingsUI.draw(g, game.screenWidth, game.screenHeight, game.vfxManager.showDamageText, GamePanel.showHitboxes, pendingReset, isAdminMode, showAdminInput, inputStr);
     }
 }

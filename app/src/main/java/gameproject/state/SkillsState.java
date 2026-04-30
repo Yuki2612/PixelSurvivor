@@ -14,7 +14,7 @@ public class SkillsState implements State {
     private List<Upgrade> breakthroughSkills;
     private int currentPage = 0;
     private final int SKILLS_PER_PAGE = 6;
-    
+
     public SkillsState() {
         breakthroughSkills = new ArrayList<>();
         for (Upgrade u : Upgrade.values()) {
@@ -77,15 +77,26 @@ public class SkillsState implements State {
 
                 if (mx >= btnX && mx <= btnX + btnW && my >= btnY && my <= btnY + btnH) {
                     Upgrade u = breakthroughSkills.get(i);
-                    int level = PlayerData.skillSoulLevels.getOrDefault(u, 0);
-                    int maxSoulLevel = 10;
-                    
-                    if (level < maxSoulLevel) {
-                        int cost = 50 * (level + 1);
-                        if (PlayerData.soulStones >= cost) {
-                            PlayerData.soulStones -= cost;
-                            PlayerData.skillSoulLevels.put(u, level + 1);
+                    boolean isUnlocked = PlayerData.unlockedSkills.contains(u);
+
+                    if (!isUnlocked) {
+                        int unlockCost = 50;
+                        if (PlayerData.soulStones >= unlockCost) {
+                            PlayerData.soulStones -= unlockCost;
+                            PlayerData.unlockedSkills.add(u);
                             gameproject.SoundManager.play("levelup");
+                            PlayerData.save();
+                        }
+                    } else {
+                        int level = PlayerData.skillSoulLevels.getOrDefault(u, 0);
+                        int maxSoulLevel = 10;
+                        if (level < maxSoulLevel) {
+                            int cost = 15 * (level + 1);
+                            if (PlayerData.soulStones >= cost) {
+                                PlayerData.soulStones -= cost;
+                                PlayerData.skillSoulLevels.put(u, level + 1);
+                                gameproject.SoundManager.play("levelup");
+                            }
                         }
                     }
                 }
@@ -108,6 +119,7 @@ public class SkillsState implements State {
         List<Upgrade> pageSkills = breakthroughSkills.subList(startIndex, endIndex);
         int totalPages = (int) Math.ceil((double) breakthroughSkills.size() / SKILLS_PER_PAGE);
 
-        gameproject.ui.SkillsUI.draw(g, game.screenWidth, game.screenHeight, pageSkills, game.input.mouseX, game.input.mouseY, currentPage, totalPages);
+        gameproject.ui.SkillsUI.draw(g, game.screenWidth, game.screenHeight, pageSkills, game.input.mouseX,
+                game.input.mouseY, currentPage, totalPages);
     }
 }

@@ -14,26 +14,33 @@ import gameproject.state.State;
 import gameproject.state.MenuState;
 import gameproject.state.GameOverState;
 import gameproject.state.WeaponSelectState;
+import gameproject.state.CharacterSelectState;
+import gameproject.state.SettingsState;
+import gameproject.state.GuideState;
+import gameproject.state.StatsState;
 import gameproject.meta.PlayerData;
 import gameproject.meta.CharacterClass;
+import gameproject.environment.MapManager;
+import gameproject.environment.Building;
 
 public class GamePanel extends JPanel implements Runnable {
     private Thread gameThread;
     private final int FPS = 60;
-    
+    public static boolean showHitboxes = false;
+
     public int screenWidth = (int) java.awt.Toolkit.getDefaultToolkit().getScreenSize().getWidth();
     public int screenHeight = (int) java.awt.Toolkit.getDefaultToolkit().getScreenSize().getHeight();
 
-    public static final int WORLD_WIDTH = 1800;
-    public static final int WORLD_HEIGHT = 1800;
-    
+    public static final int WORLD_WIDTH = 6000;
+    public static final int WORLD_HEIGHT = 6000;
+
     public float cameraX, cameraY;
 
     public InputManager input;
     public UpgradeManager upgradeManager;
     public EntityManager entityManager;
     public VFXManager vfxManager;
-    
+
     public Player player;
     public Weapon currentWeapon;
     public List<PassiveSkill> activeSkills;
@@ -45,12 +52,15 @@ public class GamePanel extends JPanel implements Runnable {
     public String currentBgKey = "background1";
     public int totalBackgrounds = 0;
 
+    public MapManager mapManager;
+    public List<Building> buildings;
+
     private State currentState;
 
     public GamePanel() {
         setPreferredSize(new Dimension(screenWidth, screenHeight));
         setFocusable(true);
-        
+
         input = new InputManager(this);
         addKeyListener(input);
         addMouseListener(input);
@@ -62,12 +72,22 @@ public class GamePanel extends JPanel implements Runnable {
         activeSkills = new ArrayList<>();
         currentWeapon = new Pistol();
 
+        // --- Ưu tiên nạp và phát nhạc Menu ngay lập tức để tránh delay ---
+        SoundManager.loadMusic("menubgm", "app/res/menubgm.wav");
+        SoundManager.playMusic("menubgm");
+
+        // --- Sau đó nạp các tài nguyên khác ---
         SoundManager.load("shoot", "app/res/shoot.wav");
         SoundManager.load("hit", "app/res/hit.wav");
         SoundManager.load("explosion", "app/res/explosion.wav");
         SoundManager.load("levelup", "app/res/levelup.wav");
         SoundManager.load("laser", "app/res/laser.wav");
         SoundManager.load("shield", "app/res/shield.wav");
+        SoundManager.load("pickup", "app/res/pickup.wav");
+
+        SoundManager.loadMusic("gamebgm1", "app/res/gamebgm1.wav");
+        SoundManager.loadMusic("gamebgm2", "app/res/gamebgm2.wav");
+        SoundManager.loadMusic("bossbgm", "app/res/bossbgm.wav");
 
         FontManager.load("app/res/pixel_font.ttf");
         ImageManager.load("heart", "app/res/heart.png");
@@ -79,14 +99,15 @@ public class GamePanel extends JPanel implements Runnable {
                 ImageManager.load("background" + bgIndex, path);
                 totalBackgrounds++;
                 bgIndex++;
-            } else break;
+            } else
+                break;
         }
 
         ImageManager.load("player", "app/res/player.png");
         for (int i = 1; i <= 5; i++) {
             ImageManager.load("player" + i, "app/res/player" + i + ".png");
             ImageManager.load("enemy" + i, "app/res/enemy" + i + ".png");
-            
+
             // Load Animations (Cập nhật thông số chính xác từ thuộc tính ảnh)
             String prefix = "player" + i;
             ImageManager.loadAnimation(prefix + "_idle_side", "app/res/" + prefix + "_idle_side.png", 16);
@@ -101,8 +122,19 @@ public class GamePanel extends JPanel implements Runnable {
         ImageManager.load("boss3", "app/res/boss3.png");
         ImageManager.load("chest1", "app/res/chest1.png");
         ImageManager.load("chest2", "app/res/chest2.png");
+        ImageManager.load("gold", "app/res/gold.png");
+        ImageManager.load("soul", "app/res/soul.png");
+        ImageManager.load("wall", "app/res/wall.png");
+        ImageManager.load("tree", "app/res/tree.png");
+        ImageManager.load("rock", "app/res/rock.png");
+        ImageManager.load("woodencrate", "app/res/woodencrate.png");
+        ImageManager.load("roof", "app/res/roof.png");
+        ImageManager.load("floor", "app/res/floor.png");
 
         PlayerData.load();
+
+        buildings = new ArrayList<>();
+        mapManager = new MapManager(WORLD_WIDTH, WORLD_HEIGHT, buildings);
 
         changeState(new MenuState());
 
@@ -112,40 +144,57 @@ public class GamePanel extends JPanel implements Runnable {
 
     public void changeState(State state) {
         this.currentState = state;
+
+        // Tự động chuyển nhạc nền dựa trên trạng thái và wave
+        if (state instanceof MenuState || state instanceof CharacterSelectState || 
+            state instanceof SettingsState || state instanceof GuideState || 
+            state instanceof StatsState) {
+            SoundManager.playMusic("menubgm");
+        } else {
+            // Logic nhạc trong gameplay
+            if (entityManager != null && entityManager.enemies.stream().anyMatch(e -> e.isBoss)) {
+                SoundManager.playMusic("bossbgm");
+            } else if (entityManager != null && entityManager.waveCount >= 10) {
+                SoundManager.playMusic("gamebgm2");
+            } else {
+                SoundManager.playMusic("gamebgm1");
+            }
+        }
     }
-    
+
     public State getCurrentState() {
         return currentState;
     }
 
     public void startNewGame() {
         CharacterClass charClass = PlayerData.selectedClass;
-        player = new Player(screenWidth / 2, screenHeight / 2, charClass);
+        player = new Player(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, charClass);
         score = 0;
         activeSkills.clear();
         currentWeapon = new Pistol();
         vfxManager.fireZones.clear();
-        
+
         long currentTime = System.currentTimeMillis();
         startTime = currentTime;
         // Adjust survive time based on wave (approx 15s per wave) for scaling
         surviveTimeSeconds = (PlayerData.debugStartWave - 1) * 15;
-        
+
         upgradeManager.startNewGame(PlayerData.debugStartLevel);
-        upgradeManager.playerDamage = (int)((10 + gameproject.meta.PlayerData.statDamageLevel) * charClass.damageMulti);
+        upgradeManager.playerDamage = (int) ((10 + gameproject.meta.PlayerData.statDamageLevel)
+                * charClass.damageMulti);
         entityManager.startNewGame(currentTime, PlayerData.debugStartWave);
-        
+
         if (totalBackgrounds > 0) {
             currentBgKey = "background" + (new java.util.Random().nextInt(totalBackgrounds) + 1);
         }
-        
+
         if (charClass.startingUpgrade != null) {
             upgradeManager.applyUpgrade(charClass.startingUpgrade, player, activeSkills, currentWeapon);
         }
 
         changeState(new gameproject.state.PlayingState());
     }
-    
+
     public void triggerGameOver() {
         PlayerData.save();
         changeState(new GameOverState(score, entityManager.waveCount, currentWeapon.name, player, activeSkills));
@@ -176,12 +225,12 @@ public class GamePanel extends JPanel implements Runnable {
         long lastFrame = System.nanoTime();
         while (true) {
             if (System.nanoTime() - lastFrame >= timePerFrame) {
+                SoundManager.updateLoopFading();
                 if (currentState != null) {
                     currentState.update(this);
                 }
-                // Dọn dẹp trạng thái click và phím nhất thời
                 input.clearClickAndKey();
-                
+
                 repaint();
                 lastFrame = System.nanoTime();
             }

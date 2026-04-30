@@ -100,10 +100,26 @@ public class CharacterSelectUI {
         
         // Resources
         g2d.setFont(FontManager.getFont(18f));
-        g2d.setColor(Color.YELLOW);
-        g2d.drawString("Gold: " + PlayerData.gold, rightX + 40, panelY + 90);
-        g2d.setColor(Color.MAGENTA);
-        g2d.drawString("Souls: " + PlayerData.soulStones, rightX + 40, panelY + 130);
+        BufferedImage goldImg = ImageManager.get("gold");
+        BufferedImage soulImg = ImageManager.get("soul");
+        
+        if (goldImg != null) {
+            g2d.drawImage(goldImg, rightX + 40, panelY + 70, 24, 24, null);
+            g2d.setColor(Color.YELLOW);
+            g2d.drawString("" + PlayerData.gold, rightX + 70, panelY + 90);
+        } else {
+            g2d.setColor(Color.YELLOW);
+            g2d.drawString("Gold: " + PlayerData.gold, rightX + 40, panelY + 90);
+        }
+        
+        if (soulImg != null) {
+            g2d.drawImage(soulImg, rightX + 40, panelY + 110, 24, 24, null);
+            g2d.setColor(Color.CYAN);
+            g2d.drawString("" + PlayerData.soulStones, rightX + 70, panelY + 130);
+        } else {
+            g2d.setColor(Color.CYAN);
+            g2d.drawString("Souls: " + PlayerData.soulStones, rightX + 40, panelY + 130);
+        }
 
         int btnW = 200, btnH = 55;
         int btnX = rightX + cardW / 2 - btnW / 2;

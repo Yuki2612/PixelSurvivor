@@ -9,13 +9,28 @@ import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.util.ArrayList;
 
-public abstract class Enemy {
+public abstract class Enemy implements gameproject.Renderable {
     protected float x, y;
     protected float speed;
     protected int size;
+
+    @Override
+    public void render(Graphics2D g) {
+        draw(g);
+    }
+
+    @Override
+    public float getBottomY() {
+        return y + size; // Chân của quái
+    }
     protected int hp, maxHp;
     protected Color color;
-    protected float kbX = 0, kbY = 0;
+
+    // THÊM: Các biến vật lý quán tính
+    public float velX = 0;
+    public float velY = 0;
+    public float kbX = 0, kbY = 0;
+
     public boolean isBoss = false;
 
     public long burnEndTime = 0;
@@ -53,10 +68,39 @@ public abstract class Enemy {
         this.color = color;
     }
 
+    // THÊM: Forgiving Hitbox SIÊU MỎNG để lách qua khe hẹp
+    public Rectangle getPhysicsHitbox() {
+        // Thu hẹp chiều ngang đáng kể (40% size) và hạ thấp xuống chân
+        int w = (int) (this.size * 0.4);
+        int h = (int) (this.size * 0.4);
+        int offsetX = (this.size - w) / 2;
+        int offsetY = this.size - h;
+        return new Rectangle((int) this.x + offsetX, (int) this.y + offsetY, w, h);
+    }
+
     public abstract void update(float playerX, float playerY, float speedMultiplier, ArrayList<Enemy> allEnemies,
-            int screenW, int screenH);
+            int screenW, int screenH, GamePanel panel);
 
     public abstract void draw(Graphics g);
+
+    /**
+     * AI Phá vật cản kiểu Clash of Clans: Nếu bị chặn bởi vật cản phá hủy được, hãy
+     * tấn công nó
+     */
+    protected void handleObstacleBreaking(float moveX, float moveY, GamePanel panel) {
+        if (moveX == 0 && moveY == 0)
+            return;
+
+        // Kiểm tra một điểm phía trước hướng di chuyển
+        int checkX = (int) (x + size / 2 + (moveX != 0 ? (moveX / Math.abs(moveX)) * (size / 2 + 5) : 0));
+        int checkY = (int) (y + size / 2 + (moveY != 0 ? (moveY / Math.abs(moveY)) * (size / 2 + 5) : 0));
+
+        if (panel.mapManager.isSolid(checkX, checkY)) {
+            // Tấn công vật cản (Sát thương 1 mỗi frame, cây có 200 HP sẽ bị phá sau khoảng
+            // 3 giây bầy đàn tấn công)
+            panel.mapManager.damageObstacleAt(checkX, checkY, 1);
+        }
+    }
 
     public void updateStatusEffects(long currentTime, VFXManager vfxManager) {
         if (burnEndTime > currentTime && currentTime - lastBurnTick >= 500) {
@@ -128,17 +172,6 @@ public abstract class Enemy {
 
     public java.util.List<Enemy> summon() {
         return null;
-    }
-
-    protected void applyPhysicsAndBounds(float moveX, float moveY, int screenW, int screenH) {
-        x += moveX;
-        y += moveY;
-        x += kbX;
-        y += kbY;
-        kbX *= 0.85f;
-        kbY *= 0.85f;
-        x = Math.max(0, Math.min(x, screenW - size));
-        y = Math.max(0, Math.min(y, screenH - size));
     }
 
     public void applyKnockback(float sourceX, float sourceY, float pushForce) {
@@ -248,6 +281,13 @@ public abstract class Enemy {
             g.setColor(Color.GREEN);
             int hpWidth = (int) ((float) hp / maxHp * size);
             g.fillRect((int) x, (int) y + size, hpWidth, 4);
+        }
+
+        // Draw Hitbox for debugging
+        if (gameproject.GamePanel.showHitboxes && !isDying) {
+            g.setColor(Color.RED);
+            Rectangle b = getPhysicsHitbox();
+            g.drawRect(b.x, b.y, b.width, b.height);
         }
     }
 

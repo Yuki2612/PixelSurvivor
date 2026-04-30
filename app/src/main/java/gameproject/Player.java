@@ -14,9 +14,19 @@ import gameproject.skill.Upgrade;
 import gameproject.meta.CharacterClass;
 import gameproject.meta.PlayerData;
 
-public class Player {
+public class Player implements Renderable {
     private float x, y;
-    private final int SIZE = 25;
+    public static final int SIZE = 25;
+
+    @Override
+    public void render(Graphics2D g) {
+        draw(g);
+    }
+
+    @Override
+    public float getBottomY() {
+        return y + SIZE; // Chân của người chơi
+    }
 
     private float speed = 5.0f;
     private long dashCooldown = 2000;
@@ -106,7 +116,7 @@ public class Player {
         animDir = newDir;
     }
 
-    public void update(int screenWidth, int screenHeight) {
+    public void update(GamePanel game) {
         boolean isMoving = false;
         String nextDir = animDir;
 
@@ -114,39 +124,59 @@ public class Player {
             if (System.currentTimeMillis() - dashStartTime >= DASH_DURATION) {
                 isDashing = false;
             } else {
-                x += dashDirX * DASH_SPEED;
-                y += dashDirY * DASH_SPEED;
+                float nextX = x + dashDirX * DASH_SPEED;
+                float nextY = y + dashDirY * DASH_SPEED;
+                
+                // Kiểm tra va chạm pixel-perfect với Hitbox thực tế
+                if (!game.mapManager.isColliding(nextX, nextY, SIZE, SIZE)) {
+                    x = nextX;
+                    y = nextY;
+                }
+                
                 x = Math.max(0, Math.min(x, GamePanel.WORLD_WIDTH - SIZE));
                 y = Math.max(0, Math.min(y, GamePanel.WORLD_HEIGHT - SIZE));
                 isMoving = true;
             }
         } else {
             float currentDirX = 0, currentDirY = 0;
+            int pad = 4;
             if (up && y > 0) {
-                y -= speed;
-                currentDirY = -1;
-                isMoving = true;
-                nextDir = "up";
+                float nextY = y - speed;
+                if (!game.mapManager.isColliding(x, nextY, SIZE, SIZE)) {
+                    y = nextY;
+                    currentDirY = -1;
+                    isMoving = true;
+                    nextDir = "up";
+                }
             }
             if (down && y < GamePanel.WORLD_HEIGHT - SIZE) {
-                y += speed;
-                currentDirY = 1;
-                isMoving = true;
-                nextDir = "down";
+                float nextY = y + speed;
+                if (!game.mapManager.isColliding(x, nextY, SIZE, SIZE)) {
+                    y = nextY;
+                    currentDirY = 1;
+                    isMoving = true;
+                    nextDir = "down";
+                }
             }
             if (left && x > 0) {
-                x -= speed;
-                currentDirX = -1;
-                isMoving = true;
-                nextDir = "side";
-                facingRight = false;
+                float nextX = x - speed;
+                if (!game.mapManager.isColliding(nextX, y, SIZE, SIZE)) {
+                    x = nextX;
+                    currentDirX = -1;
+                    isMoving = true;
+                    nextDir = "side";
+                    facingRight = false;
+                }
             }
             if (right && x < GamePanel.WORLD_WIDTH - SIZE) {
-                x += speed;
-                currentDirX = 1;
-                isMoving = true;
-                nextDir = "side";
-                facingRight = true;
+                float nextX = x + speed;
+                if (!game.mapManager.isColliding(nextX, y, SIZE, SIZE)) {
+                    x = nextX;
+                    currentDirX = 1;
+                    isMoving = true;
+                    nextDir = "side";
+                    facingRight = true;
+                }
             }
 
             if (isMoving) {
@@ -191,9 +221,15 @@ public class Player {
             }
             g2d.dispose();
         } else {
-            // Fallback cuối: Khối vuông màu đỏ
             g.setColor(isDashing ? Color.CYAN : Color.RED);
             g.fillRect((int) x, (int) y, SIZE, SIZE);
+        }
+
+        // Draw Hitbox for debugging
+        if (GamePanel.showHitboxes) {
+            g.setColor(Color.GREEN);
+            Rectangle b = getBounds();
+            g.drawRect(b.x, b.y, b.width, b.height);
         }
     }
 

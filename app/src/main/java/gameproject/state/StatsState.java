@@ -22,7 +22,7 @@ public class StatsState implements State {
     };
     private int[] statLevels = new int[6];
     private int[] maxLevels = {30, 20, 10, 10, 20, 10};
-    private int[] baseCosts = {100, 200, 150, 100, 150, 200};
+    private int[] baseCosts = {80, 250, 120, 100, 180, 220};
 
     public class StatNode {
         public int statIndex;
@@ -82,7 +82,7 @@ public class StatsState implements State {
                         if (statLevels[req] == 0) canUnlock = false;
                     }
                     if (canUnlock) {
-                        int cost = (int)(baseCosts[node.statIndex] * Math.pow(1.1, totalUpgrades));
+                        int cost = (int)(baseCosts[node.statIndex] * Math.pow(1.06, totalUpgrades));
                         if (statLevels[node.statIndex] < maxLevels[node.statIndex] && PlayerData.gold >= cost) {
                             PlayerData.gold -= cost;
                             if (node.statIndex == 0) PlayerData.statHealthLevel++;
@@ -114,7 +114,6 @@ public class StatsState implements State {
 
     @Override
     public void render(GamePanel game, Graphics g) {
-        if (nodes == null) return;
         gameproject.ui.StatsUI.draw(g, game.screenWidth, game.screenHeight, statNames, statDescs, statLevels, maxLevels, PlayerData.gold, nodes, game.input.mouseX, game.input.mouseY);
     }
 }

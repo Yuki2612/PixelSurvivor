@@ -8,6 +8,7 @@ public class PlayerData {
     public static int gold = 0;
     public static int soulStones = 0;
     public static Set<CharacterClass> unlockedClasses = new HashSet<>();
+    public static Set<gameproject.skill.Upgrade> unlockedSkills = new HashSet<>();
     public static CharacterClass selectedClass = CharacterClass.MERCENARY;
 
     public static String getPlayerImageKey() {
@@ -31,6 +32,15 @@ public class PlayerData {
 
     public static void load() {
         unlockedClasses.add(CharacterClass.MERCENARY); // Luôn mở khóa Mercenary
+        
+        // Default unlocked skills (excluding Shield, Meteor, Pulsewave)
+        unlockedSkills.add(gameproject.skill.Upgrade.CHAIN_LIGHTNING);
+        unlockedSkills.add(gameproject.skill.Upgrade.TRAIL_OF_FIRE);
+        unlockedSkills.add(gameproject.skill.Upgrade.ORBITING_ORBS);
+        unlockedSkills.add(gameproject.skill.Upgrade.EXPLOSIVE_CORPSE);
+        unlockedSkills.add(gameproject.skill.Upgrade.FROST_AURA);
+        unlockedSkills.add(gameproject.skill.Upgrade.POISON_CLOUD);
+
         File file = new File(SAVE_FILE);
         if (!file.exists()) return;
 
@@ -83,6 +93,17 @@ public class PlayerData {
                     }
                 }
             }
+
+            String unlockedSkillsLine = br.readLine();
+            if (unlockedSkillsLine != null && unlockedSkillsLine.contains(":") && unlockedSkillsLine.split(":").length > 1) {
+                unlockedSkills.clear(); // Overwrite defaults if file has data
+                String[] sks = unlockedSkillsLine.split(":")[1].split(",");
+                for (String s : sks) {
+                    if (!s.trim().isEmpty()) {
+                        try { unlockedSkills.add(gameproject.skill.Upgrade.valueOf(s.trim())); } catch(Exception e) {}
+                    }
+                }
+            }
         } catch (Exception e) {
             System.out.println("Error loading save file: " + e.getMessage());
         }
@@ -107,6 +128,12 @@ public class PlayerData {
                 sbSkills.append(entry.getKey().name()).append("=").append(entry.getValue()).append(",");
             }
             pw.println("Skills:" + sbSkills.toString());
+
+            StringBuilder sbUnSkills = new StringBuilder();
+            for (gameproject.skill.Upgrade u : unlockedSkills) {
+                sbUnSkills.append(u.name()).append(",");
+            }
+            pw.println("UnlockedSkills:" + sbUnSkills.toString());
         } catch (Exception e) {
             System.out.println("Error saving file: " + e.getMessage());
         }
