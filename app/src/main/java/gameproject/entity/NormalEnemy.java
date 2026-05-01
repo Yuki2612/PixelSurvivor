@@ -47,7 +47,7 @@ public class NormalEnemy extends Enemy {
     @Override
     public void update(float playerX, float playerY, float speedMultiplier, ArrayList<Enemy> allEnemies, int screenW,
             int screenH, GamePanel panel) {
-        
+
         // Gọi bộ não AI tập trung để xử lý di chuyển và va chạm (Sliding Collision)
         EnemyController.moveEnemy(this, panel, speedMultiplier);
 

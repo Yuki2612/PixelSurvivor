@@ -16,8 +16,9 @@ public class EnergyShieldSkill implements PassiveSkill {
     public void update(Player player, ArrayList<Enemy> enemies, VFXManager vfxManager, long currentTime) {
         int level = player.getBreakthroughLevel(Upgrade.ENERGY_SHIELD);
         if (level > 0) {
-            float soulMulti = 1.0f + (gameproject.meta.PlayerData.skillSoulLevels.getOrDefault(Upgrade.ENERGY_SHIELD, 0) * 0.05f);
-            long cooldown = (long)((15000 - (level * 1000)) / soulMulti);
+            float soulMulti = 1.0f
+                    + (gameproject.meta.PlayerData.skillSoulLevels.getOrDefault(Upgrade.ENERGY_SHIELD, 0) * 0.05f);
+            long cooldown = (long) ((15000 - (level * 1000)) / soulMulti);
             if (currentTime - lastActivateTime > cooldown) {
                 player.addInvulnerability(3000); // 3 giây bất tử
                 lastActivateTime = currentTime;

@@ -75,7 +75,8 @@ public class EnemyController {
             if (collided && (Math.abs(enemy.kbX) > 0.1f || Math.abs(enemy.kbY) > 0.1f)) {
                 enemy.kbX = 0;
                 enemy.kbY = 0;
-                // Khi chạm tường, dừng quán tính theo hướng va chạm (Tùy chọn, ở đây ta triệt tiêu toàn bộ KB)
+                // Khi chạm tường, dừng quán tính theo hướng va chạm (Tùy chọn, ở đây ta triệt
+                // tiêu toàn bộ KB)
             }
         }
 
@@ -163,12 +164,16 @@ public class EnemyController {
                     float db = (ab.y + ab.height) - cy;
 
                     float minDist = Math.min(Math.min(dl, dr), Math.min(dt, db));
-                    if (minDist == dl) enemy.x -= (dl + radius);
-                    else if (minDist == dr) enemy.x += (dr + radius);
-                    else if (minDist == dt) enemy.y -= (dt + radius);
-                    else enemy.y += (db + radius);
+                    if (minDist == dl)
+                        enemy.x -= (dl + radius);
+                    else if (minDist == dr)
+                        enemy.x += (dr + radius);
+                    else if (minDist == dt)
+                        enemy.y -= (dt + radius);
+                    else
+                        enemy.y += (db + radius);
                 }
-                
+
                 // Cập nhật lại tâm sau khi xử lý va chạm này
                 cx = enemy.x + enemy.size / 2.0f;
                 cy = enemy.y + enemy.size - radius;

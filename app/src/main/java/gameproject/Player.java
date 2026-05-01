@@ -25,7 +25,7 @@ public class Player implements Renderable {
 
     @Override
     public float getBottomY() {
-        return y + SIZE; 
+        return y + SIZE;
     }
 
     private float speed = 4f;
@@ -46,7 +46,9 @@ public class Player implements Renderable {
     private final long DASH_DURATION = 150;
     private final float DASH_SPEED = 18.0f;
 
-    public enum PlayerState { IDLE, RUN }
+    public enum PlayerState {
+        IDLE, RUN
+    }
 
     private PlayerState currentState = PlayerState.IDLE;
     private String animDir = "down";
@@ -54,7 +56,7 @@ public class Player implements Renderable {
 
     private Map<String, Animation> animations = new HashMap<>();
     private Animation activeAnim;
-    
+
     // Combo System integration
     private ComboManager comboManager;
 
@@ -82,10 +84,12 @@ public class Player implements Renderable {
                 int delay = s.equals("run") ? 6 : 8;
                 Animation anim = new Animation(delay);
                 BufferedImage[] frames = ImageManager.getAnimation(pKey + "_" + key);
-                if (frames == null) frames = ImageManager.getAnimation(fallback + "_" + key);
+                if (frames == null)
+                    frames = ImageManager.getAnimation(fallback + "_" + key);
                 if (frames == null && s.equals("idle") && d.equals("up")) {
                     frames = ImageManager.getAnimation(pKey + "_run_up");
-                    if (frames == null) frames = ImageManager.getAnimation(fallback + "_run_up");
+                    if (frames == null)
+                        frames = ImageManager.getAnimation(fallback + "_run_up");
                 }
                 if (frames != null) {
                     anim.setFrames(frames);
@@ -94,7 +98,8 @@ public class Player implements Renderable {
             }
         }
         activeAnim = animations.get("idle_down");
-        if (activeAnim == null) activeAnim = animations.get("idle_side");
+        if (activeAnim == null)
+            activeAnim = animations.get("idle_side");
     }
 
     private void setState(PlayerState newState, String newDir) {
@@ -172,17 +177,22 @@ public class Player implements Renderable {
                 lastDirX = currentDirX;
                 lastDirY = currentDirY;
             } else {
-                if (lastDirY < 0) nextDir = "up";
-                else if (lastDirY > 0) nextDir = "down";
-                else nextDir = "side";
+                if (lastDirY < 0)
+                    nextDir = "up";
+                else if (lastDirY > 0)
+                    nextDir = "down";
+                else
+                    nextDir = "side";
             }
         }
         setState(isMoving ? PlayerState.RUN : PlayerState.IDLE, nextDir);
-        if (activeAnim != null) activeAnim.update();
+        if (activeAnim != null)
+            activeAnim.update();
     }
 
     public void draw(Graphics g) {
-        if (isInvulnerable() && System.currentTimeMillis() % 200 < 100) return;
+        if (isInvulnerable() && System.currentTimeMillis() % 200 < 100)
+            return;
         BufferedImage img = (activeAnim != null) ? activeAnim.getCurrentFrame() : null;
         if (img != null) {
             int drawX = (int) x - 10;
@@ -221,8 +231,13 @@ public class Player implements Renderable {
                     dashStartTime = System.currentTimeMillis();
                     lastDashTime = dashStartTime;
                     float length = (float) Math.sqrt(lastDirX * lastDirX + lastDirY * lastDirY);
-                    if (length == 0) { dashDirX = 1; dashDirY = 0; }
-                    else { dashDirX = lastDirX / length; dashDirY = lastDirY / length; }
+                    if (length == 0) {
+                        dashDirX = 1;
+                        dashDirY = 0;
+                    } else {
+                        dashDirX = lastDirX / length;
+                        dashDirY = lastDirY / length;
+                    }
                 }
             }
         }
@@ -237,14 +252,38 @@ public class Player implements Renderable {
         }
     }
 
-    public void resetMovement() { up = down = left = right = false; }
-    public void upgradeSpeed(float amount) { this.speed += amount; }
-    public void upgradeDashCooldown(long reduction) { this.dashCooldown = Math.max(500, this.dashCooldown - reduction); }
-    public void addHeart() { if (hearts < MAX_HEARTS) hearts++; }
-    public int getHearts() { return hearts; }
+    public void resetMovement() {
+        up = down = left = right = false;
+    }
+
+    public void upgradeSpeed(float amount) {
+        this.speed += amount;
+    }
+
+    public void upgradeDashCooldown(long reduction) {
+        this.dashCooldown = Math.max(500, this.dashCooldown - reduction);
+    }
+
+    public void addHeart() {
+        if (hearts < MAX_HEARTS)
+            hearts++;
+    }
+
+    public int getHearts() {
+        return hearts;
+    }
+
+    public int getMaxHearts() {
+        return MAX_HEARTS;
+    }
+
+    public float getSpeed() {
+        return speed;
+    }
 
     public boolean takeHit() {
-        if (isInvulnerable()) return false;
+        if (isInvulnerable())
+            return false;
         hearts--;
         invulnerableUntil = System.currentTimeMillis() + 1000;
         return hearts <= 0;
@@ -252,33 +291,67 @@ public class Player implements Renderable {
 
     public void levelUpUpgrade(Upgrade u) {
         int current = upgradeLevels.getOrDefault(u, 0);
-        if (current < 10) upgradeLevels.put(u, current + 1);
+        if (current < 10)
+            upgradeLevels.put(u, current + 1);
     }
 
-    public int getUpgradeLevel(Upgrade u) { return upgradeLevels.getOrDefault(u, 0); }
-    public void levelUpBreakthrough(Upgrade u) { levelUpUpgrade(u); }
-    public int getBreakthroughLevel(Upgrade u) { return getUpgradeLevel(u); }
+    public int getUpgradeLevel(Upgrade u) {
+        return upgradeLevels.getOrDefault(u, 0);
+    }
+
+    public void levelUpBreakthrough(Upgrade u) {
+        levelUpUpgrade(u);
+    }
+
+    public int getBreakthroughLevel(Upgrade u) {
+        return getUpgradeLevel(u);
+    }
 
     public List<Upgrade> getOwnedBreakthroughs() {
         List<Upgrade> list = new ArrayList<>();
         for (Upgrade u : upgradeLevels.keySet()) {
-            if (u.isBreakthrough) list.add(u);
+            if (u.isBreakthrough)
+                list.add(u);
         }
         return list;
     }
 
-    public boolean isInvulnerable() { return System.currentTimeMillis() < invulnerableUntil; }
+    public boolean isInvulnerable() {
+        return System.currentTimeMillis() < invulnerableUntil;
+    }
+
     public void addInvulnerability(long duration) {
         long now = System.currentTimeMillis();
-        if (invulnerableUntil < now) invulnerableUntil = now;
+        if (invulnerableUntil < now)
+            invulnerableUntil = now;
         invulnerableUntil += duration;
     }
 
-    public Rectangle getBounds() { return new Rectangle((int) x, (int) y, SIZE, SIZE); }
-    public float getX() { return x; }
-    public float getY() { return y; }
-    public boolean isDashing() { return isDashing; }
-    public long getLastDashTime() { return lastDashTime; }
-    public long getDashCooldown() { return dashCooldown; }
-    public ComboManager getComboManager() { return comboManager; }
+    public Rectangle getBounds() {
+        return new Rectangle((int) x, (int) y, SIZE, SIZE);
+    }
+
+    public float getX() {
+        return x;
+    }
+
+    public float getY() {
+        return y;
+    }
+
+    public boolean isDashing() {
+        return isDashing;
+    }
+
+    public long getLastDashTime() {
+        return lastDashTime;
+    }
+
+    public long getDashCooldown() {
+        return dashCooldown;
+    }
+
+    public ComboManager getComboManager() {
+        return comboManager;
+    }
 }

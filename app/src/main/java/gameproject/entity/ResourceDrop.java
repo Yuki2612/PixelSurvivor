@@ -6,8 +6,10 @@ import gameproject.ImageManager;
 import gameproject.meta.PlayerData;
 
 public class ResourceDrop {
-    public enum Type { GOLD, SOUL }
-    
+    public enum Type {
+        GOLD, SOUL
+    }
+
     public float x, y;
     public Type type;
     public int amount;
@@ -21,7 +23,7 @@ public class ResourceDrop {
         this.type = type;
         this.amount = amount;
         this.expireTime = expireTime;
-        
+
         double angle = Math.random() * Math.PI * 2;
         float force = (float) (Math.random() * 3 + 1.5);
         this.velX = (float) Math.cos(angle) * force;
@@ -70,14 +72,14 @@ public class ResourceDrop {
         java.awt.image.BufferedImage img = ImageManager.get(type == Type.GOLD ? "gold" : "soul");
         int drawX = (int) x;
         int drawY = (int) y;
-        
+
         if (img != null) {
             g.drawImage(img, drawX - 12, drawY - 12, 24, 24, null);
         } else {
             g.setColor(type == Type.GOLD ? java.awt.Color.YELLOW : java.awt.Color.CYAN);
             g.fillOval(drawX - 6, drawY - 6, 12, 12);
         }
-        
+
         // Vẽ số lượng
         if (amount > 1) {
             g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 12));

@@ -7,6 +7,7 @@ import gameproject.GamePanel;
 import gameproject.ImageManager;
 import gameproject.SoundManager;
 import gameproject.ui.HUD;
+import gameproject.ui.CharacterStatsUI;
 import gameproject.skill.Upgrade;
 import gameproject.skill.PassiveSkill;
 import gameproject.skill.FrostAuraSkill;
@@ -14,6 +15,9 @@ import gameproject.skill.PoisonCloudSkill;
 import gameproject.skill.OrbitingOrbsSkill;
 
 public class PlayingState implements State {
+    private boolean showStats = false;
+    private boolean iKeyPrev = false;
+
     @Override
     public void update(GamePanel game) {
         if (game.input.escPressed) {
@@ -23,6 +27,18 @@ public class PlayingState implements State {
             game.changeState(new PauseState());
             return;
         }
+
+        // Toggle Stats with 'I' key
+        if (game.input.iPressed && !iKeyPrev) {
+            showStats = !showStats;
+            if (showStats) {
+                game.player.resetMovement();
+                game.input.isMouseHolding = false;
+            }
+        }
+        iKeyPrev = game.input.iPressed;
+
+        if (showStats) return;
 
         long currentTime = System.currentTimeMillis();
         int surviveTimeSeconds = (int) ((currentTime - game.startTime) / 1000);
@@ -155,12 +171,14 @@ public class PlayingState implements State {
             }
         }
 
-        for (PassiveSkill skill : game.activeSkills) {
-            if (skill instanceof gameproject.skill.FrostAuraSkill ||
-                    skill instanceof gameproject.skill.PoisonCloudSkill ||
-                    skill instanceof gameproject.skill.PulseWaveSkill ||
-                    skill instanceof gameproject.skill.EnergyShieldSkill) {
-                skill.draw(g, game.player);
+        synchronized (game.activeSkills) {
+            for (PassiveSkill skill : game.activeSkills) {
+                if (skill instanceof gameproject.skill.FrostAuraSkill ||
+                        skill instanceof gameproject.skill.PoisonCloudSkill ||
+                        skill instanceof gameproject.skill.PulseWaveSkill ||
+                        skill instanceof gameproject.skill.EnergyShieldSkill) {
+                    skill.draw(g, game.player);
+                }
             }
         }
 
@@ -190,9 +208,11 @@ public class PlayingState implements State {
         // 4. Vẽ các hiệu ứng bay trên cao (Đạn)
         game.entityManager.drawProjectiles(g);
 
-        for (PassiveSkill skill : game.activeSkills) {
-            if (skill instanceof gameproject.skill.OrbitingOrbsSkill)
-                skill.draw(g, game.player);
+        synchronized (game.activeSkills) {
+            for (PassiveSkill skill : game.activeSkills) {
+                if (skill instanceof gameproject.skill.OrbitingOrbsSkill)
+                    skill.draw(g, game.player);
+            }
         }
 
         // 5. VẼ MÁI NHÀ (Trên cùng) - Đồng bộ hóa để tránh CME
@@ -212,5 +232,9 @@ public class PlayingState implements State {
         // Overlay toàn màn hình (flash đỏ, wave banner, combo vignette) — sau cùng
         long now = System.currentTimeMillis();
         game.vfxManager.drawOverlays(g, game.screenWidth, game.screenHeight, now, game.player);
+
+        if (showStats) {
+            CharacterStatsUI.draw(g, game, game.player);
+        }
     }
 }
