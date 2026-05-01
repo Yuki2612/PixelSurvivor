@@ -34,8 +34,8 @@ public class OrbitingOrbsSkill implements PassiveSkill {
 
         for (int i = 0; i < numOrbs; i++) {
             float angle = orbitAngle + (float) (i * 2 * Math.PI / numOrbs);
-            int ox = (int) (player.getX() + 20 + Math.cos(angle) * 60);
-            int oy = (int) (player.getY() + 20 + Math.sin(angle) * 60);
+            int ox = (int) (player.getX() + 20 + Math.cos(angle) * 90);
+            int oy = (int) (player.getY() + 20 + Math.sin(angle) * 90);
             Rectangle orbHitbox = new Rectangle(ox - 10, oy - 10, 20, 20);
 
             for (Enemy e : enemies) {
@@ -65,8 +65,8 @@ public class OrbitingOrbsSkill implements PassiveSkill {
         int numOrbs = Math.min(orbLevel, 5);
         for (int i = 0; i < numOrbs; i++) {
             float angle = orbitAngle + (float) (i * 2 * Math.PI / numOrbs);
-            int ox = (int) (player.getX() + 20 + Math.cos(angle) * 60);
-            int oy = (int) (player.getY() + 20 + Math.sin(angle) * 60);
+            int ox = (int) (player.getX() + 20 + Math.cos(angle) * 90);
+            int oy = (int) (player.getY() + 20 + Math.sin(angle) * 90);
             g.fillOval(ox - 10, oy - 10, 20, 20);
         }
     }

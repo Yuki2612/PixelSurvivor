@@ -419,14 +419,14 @@ public class VFXManager {
                 float alpha = Math.min(1f, life * 3f);
                 if (alpha <= 0) continue;
                 g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
-                g2d.setFont(FontManager.getFont(b.text.length() > 20 ? 32f : 52f));
+                g2d.setFont(FontManager.getFont(b.text.length() > 20 ? 24f : 32f));
                 int tw = g2d.getFontMetrics().stringWidth(b.text);
                 int bx = screenW / 2 - tw / 2;
                 int by = screenH / 3;
                 g2d.setColor(new Color(0, 0, 0, 180));
-                g2d.fillRoundRect(bx - 30, by - 55, tw + 60, 75, 16, 16);
+                g2d.fillRoundRect(bx - 20, by - 40, tw + 40, 50, 12, 12);
                 g2d.setColor(Color.BLACK);
-                g2d.drawString(b.text, bx + 3, by + 3);
+                g2d.drawString(b.text, bx + 2, by + 2);
                 g2d.setColor(b.color);
                 g2d.drawString(b.text, bx, by);
                 g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));

@@ -11,7 +11,7 @@ public class TeleporterBoss extends Enemy {
     private Random rand = new Random();
 
     public TeleporterBoss(float startX, float startY, int surviveTimeSeconds) {
-        super(startX, startY, 60, 450 + (surviveTimeSeconds * 3), 0.9f, Color.MAGENTA);
+        super(startX, startY, 90, 550 + (surviveTimeSeconds * 4), 0.9f, Color.MAGENTA);
         this.isBoss = true;
     }
 
@@ -24,7 +24,7 @@ public class TeleporterBoss extends Enemy {
             int screenH, GamePanel panel) {
         actionTimer--;
         if (actionTimer <= 0) {
-            actionTimer = 300; // Cooldown dài hơn chút
+            actionTimer = 600; // Cooldown dài hơn chút
             teleportsLeft = 4; // Dịch chuyển 4 lần
             teleportGap = 0;
         }

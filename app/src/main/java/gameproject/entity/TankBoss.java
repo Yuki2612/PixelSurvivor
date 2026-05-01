@@ -11,7 +11,7 @@ public class TankBoss extends Enemy {
     private java.util.List<Enemy> spawnedEnemies = new java.util.ArrayList<>();
 
     public TankBoss(float startX, float startY, int surviveTimeSeconds) {
-        super(startX, startY, 80, (int) ((500 + (surviveTimeSeconds * 3)) * 1.5f), 1f, Color.DARK_GRAY);
+        super(startX, startY, 80, (int) ((600 + (surviveTimeSeconds * 4)) * 1.5f), 1f, Color.DARK_GRAY);
         this.isBoss = true;
         this.surviveTime = surviveTimeSeconds;
     }

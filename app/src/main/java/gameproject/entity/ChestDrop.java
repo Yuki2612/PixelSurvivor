@@ -15,6 +15,6 @@ public class ChestDrop {
     }
 
     public Rectangle getBounds() {
-        return new Rectangle((int) x, (int) y, 40, 40);
+        return new Rectangle((int) x, (int) y, 80, 80);
     }
 }

@@ -150,7 +150,7 @@ public class PlayingState implements State {
             
             eventPhase = EventPhase.WARNING;
             nextPhaseTime = currentTime + 10000;
-            eventEndTime = currentTime + 70000;
+            eventEndTime = currentTime + 50000; // Tổng 50s (10s báo + 40s chạy)
         }
 
         if (activeEvent != EventType.NONE) {

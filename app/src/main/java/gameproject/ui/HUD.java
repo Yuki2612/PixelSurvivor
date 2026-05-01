@@ -194,7 +194,7 @@ public class HUD {
                 shakeX = (int) (Math.random() * 6 - 3);
             }
 
-            g.setFont(gameproject.FontManager.getFont(48f * cm.getPulseScale()));
+            g.setFont(gameproject.FontManager.getFont(36f * cm.getPulseScale()));
             String comboText = comboCount + " COMBO";
             int tw = g.getFontMetrics().stringWidth(comboText);
 
@@ -210,16 +210,16 @@ public class HUD {
             String title = cm.getTierTitle();
             if (!title.isEmpty()) {
                 float titleScale = cm.getTier() == 3 ? (cm.getPulseScale() * 1.2f) : 1.0f;
-                g.setFont(gameproject.FontManager.getFont(40f * titleScale));
+                g.setFont(gameproject.FontManager.getFont(28f * titleScale));
                 int ttw = g.getFontMetrics().stringWidth(title);
                 g.setColor(java.awt.Color.BLACK);
-                g.drawString(title, centerX - ttw / 2 + 2, comboY - 60 + 2);
+                g.drawString(title, centerX - ttw / 2 + 2, comboY - 45 + 2);
                 g.setColor(comboColor);
-                g.drawString(title, centerX - ttw / 2, comboY - 60);
+                g.drawString(title, centerX - ttw / 2, comboY - 45);
             }
 
             // Draw timer bar
-            int barW = 140;
+            int barW = 100;
             int barH = 8;
             int comboBarX = centerX - barW / 2;
             int comboBarY = comboY + 15;
@@ -233,7 +233,7 @@ public class HUD {
             float atkBonus = cm.getFireRateBonus() * 100;
             float spdBonus = cm.getMoveSpeedBonus() * 100;
             if (atkBonus > 0) {
-                g.setFont(gameproject.FontManager.getFont(14f));
+                g.setFont(gameproject.FontManager.getFont(12f));
                 String buffText = "+" + (int) atkBonus + "% FIRE RATE";
                 if (spdBonus > 0)
                     buffText += " | +" + (int) spdBonus + "% SPEED";

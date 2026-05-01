@@ -12,7 +12,7 @@ public class ChargerBoss extends Enemy {
     private float baseSpeed = 1.5f;
 
     public ChargerBoss(float startX, float startY, int surviveTimeSeconds) {
-        super(startX, startY, 60, 400 + (surviveTimeSeconds * 3), 1.2f, Color.RED);
+        super(startX, startY, 90, 500 + (surviveTimeSeconds * 4), 1.2f, Color.RED);
         this.isBoss = true;
     }
 
@@ -28,7 +28,7 @@ public class ChargerBoss extends Enemy {
             chargeFrames = 30;
         }
         if (isCharging) {
-            speed = 4.0f;
+            speed = 5.0f;
             chargeFrames--;
 
             // Bắn đạn xung quanh khi đang lướt (mỗi 5 frame bắn 1 lần burst)
@@ -37,7 +37,7 @@ public class ChargerBoss extends Enemy {
                     double angle = Math.toRadians(i * 45);
                     float tx = x + (float) Math.cos(angle) * 100;
                     float ty = y + (float) Math.sin(angle) * 100;
-                    gameproject.weapon.Projectile p = new gameproject.weapon.Projectile(x, y, tx, ty, 0.4f, 400f);
+                    gameproject.weapon.Projectile p = new gameproject.weapon.Projectile(x, y, tx, ty, 0.75f, 600f);
                     p.isEnemyBullet = true;
                     p.damage = 1;
                     nextShots.add(p);

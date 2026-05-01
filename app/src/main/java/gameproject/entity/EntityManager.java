@@ -546,10 +546,10 @@ public class EntityManager {
                 int dy = (int) Math.round(c.y);
                 java.awt.image.BufferedImage img = gameproject.ImageManager.get(c.isRare ? "chest2" : "chest1");
                 if (img != null) {
-                    g.drawImage(img, dx, dy, 40, 40, null);
+                    g.drawImage(img, dx, dy, 80, 80, null);
                 } else {
                     g.setColor(c.isRare ? java.awt.Color.MAGENTA : java.awt.Color.ORANGE);
-                    g.fillRect(dx, dy, 40, 40);
+                    g.fillRect(dx, dy, 80, 80);
                     g.setColor(java.awt.Color.WHITE);
                     g.drawString(c.isRare ? "RARE" : "CHEST", dx - 5, dy - 5);
                 }
