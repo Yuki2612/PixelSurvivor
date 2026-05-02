@@ -40,7 +40,7 @@ Các sự kiện xuất hiện ngẫu nhiên với cảnh báo trước 10 giây
 ### 2. Tương tác Môi trường
 - **Hệ thống Tòa nhà:** Các công trình sinh ngẫu nhiên (Rectangle, L, T, U). Mái nhà sẽ tự động mờ đi (Fade-out) khi người chơi bước vào bên trong. Đây là nơi trú ẩn an toàn duy nhất trong sự kiện Acid Rain.
 - **Vật thể phá hủy (Destructibles):** Người chơi có thể tấn công và phá hủy cây cối, đá và thùng gỗ. Phá hủy thùng gỗ có cơ hội rơi ra các vật phẩm hỗ trợ.
-- **AI Pathfinding:** Quái vật sử dụng Flow Field để tìm đường vòng qua vật cản, nhưng chúng sẽ chủ động tấn công và phá hủy vật thể nếu bị chặn đường quá lâu.
+- **AI Pathfinding:** Quái vật sử dụng Flow Field để tìm đường vòng qua vật cản.
 
 ---
 
@@ -61,4 +61,4 @@ Dự án giải quyết triệt để vấn đề rung lắc hình ảnh (jitter
 - `gameproject.ui`: Hệ thống HUD và các giao diện người dùng Overlay.
 
 ---
-Phát triển bởi đội ngũ đam mê kỹ thuật và trải nghiệm người dùng.
+Đang phát triển 
