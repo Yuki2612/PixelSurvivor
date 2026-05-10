@@ -53,11 +53,11 @@ public class SkillsState implements State {
 
             int columns = 3;
             int cardW = 280;
-            int cardH = 200;
-            int gap = 30;
+            int cardH = 220;
+            int gap = 25;
             int totalGridW = columns * cardW + (columns - 1) * gap;
             int startX = (game.screenWidth - totalGridW) / 2;
-            int startY = 140;
+            int startY = 130;
 
             int startIndex = currentPage * SKILLS_PER_PAGE;
             int endIndex = Math.min(startIndex + SKILLS_PER_PAGE, breakthroughSkills.size());
@@ -80,7 +80,7 @@ public class SkillsState implements State {
                     boolean isUnlocked = PlayerData.unlockedSkills.contains(u);
 
                     if (!isUnlocked) {
-                        int unlockCost = 50;
+                        int unlockCost = 20;
                         if (PlayerData.soulStones >= unlockCost) {
                             PlayerData.soulStones -= unlockCost;
                             PlayerData.unlockedSkills.add(u);
@@ -91,11 +91,12 @@ public class SkillsState implements State {
                         int level = PlayerData.skillSoulLevels.getOrDefault(u, 0);
                         int maxSoulLevel = 10;
                         if (level < maxSoulLevel) {
-                            int cost = 15 * (level + 1);
+                            int cost = (int) (15 * Math.pow(1.2, level));
                             if (PlayerData.soulStones >= cost) {
                                 PlayerData.soulStones -= cost;
                                 PlayerData.skillSoulLevels.put(u, level + 1);
                                 gameproject.SoundManager.play("levelup");
+                                PlayerData.save();
                             }
                         }
                     }

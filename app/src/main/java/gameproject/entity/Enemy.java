@@ -33,6 +33,19 @@ public abstract class Enemy implements gameproject.Renderable {
     public float kbX = 0, kbY = 0;
 
     public boolean isBoss = false;
+    public boolean isElite = false;
+    public EliteAffix eliteAffix = null;
+    public int shieldHits = 0; // Cho affix SHIELDED
+    public boolean hasSplit = false; // Cho affix SPLITTING
+    public boolean movingRight = true;
+
+    public enum EliteAffix {
+        EXPLOSIVE, // Nổ khi chết
+        SPLITTING, // Tách đôi khi HP thấp
+        SHIELDED,  // Khiên 3 hit
+        VAMPIRIC,  // Hút máu khi chạm
+        BERSERKER  // Tăng tốc khi HP thấp
+    }
 
     public long burnEndTime = 0;
     public long chillEndTime = 0;
@@ -41,6 +54,8 @@ public abstract class Enemy implements gameproject.Renderable {
     public long freezeEndTime = 0;
     public long plasmaEndTime = 0;
     public boolean inAcidZone = false;
+    public long lastVampireHealTime = 0; // Cho affix VAMPIRIC
+    public long lastFireZoneDamageTick = 0; // Cho skill Trail of Fire
 
     // Cache chỉ số sát thương của player – được EntityManager cập nhật mỗi frame
     // Dùng để phản ứng nguyên tố scale cùng progression của player
@@ -55,10 +70,11 @@ public abstract class Enemy implements gameproject.Renderable {
     public long plasmaCooldown = 0;
 
     // ── Phase-1 VFX ──────────────────────────────────────────────
-    private long hitFlashEndTime = 0; // White flash khi nhận damage
-    private long deathFadeStartTime = -1; // -1 = chưa bắt đầu chết
+    protected long hitFlashEndTime = 0; // White flash khi nhận damage
+    protected long deathFadeStartTime = -1; // -1 = chưa bắt đầu chết
     public long deathFadeDuration = 300;
     public boolean isDying = false; // đang trong animation chết
+    public boolean rewardDropped = false; // đã rơi đồ chưa
 
     public Enemy(float x, float y, int size, int maxHp, float speed, Color color) {
         this.x = x;
@@ -85,39 +101,20 @@ public abstract class Enemy implements gameproject.Renderable {
 
     public abstract void draw(Graphics g);
 
-    /**
-     * AI Phá vật cản kiểu Clash of Clans: Nếu bị chặn bởi vật cản phá hủy được, hãy
-     * tấn công nó
-     */
-    protected void handleObstacleBreaking(float moveX, float moveY, GamePanel panel) {
-        if (moveX == 0 && moveY == 0)
-            return;
-
-        // Kiểm tra một điểm phía trước hướng di chuyển
-        int checkX = (int) (x + size / 2 + (moveX != 0 ? (moveX / Math.abs(moveX)) * (size / 2 + 5) : 0));
-        int checkY = (int) (y + size / 2 + (moveY != 0 ? (moveY / Math.abs(moveY)) * (size / 2 + 5) : 0));
-
-        if (panel.mapManager.isSolid(checkX, checkY)) {
-            // Tấn công vật cản (Sát thương 1 mỗi frame, cây có 200 HP sẽ bị phá sau khoảng
-            // 3 giây bầy đàn tấn công)
-            panel.mapManager.damageObstacleAt(checkX, checkY, 1);
-        }
-    }
-
     public void updateStatusEffects(long currentTime, VFXManager vfxManager) {
         if (burnEndTime > currentTime && currentTime - lastBurnTick >= 500) {
-            // Burn DoT: 33% playerDamage/tick
-            takeDamage(Math.max(3, playerDamageCache / 3), vfxManager, currentTime);
+            // Burn DoT: 25% playerDamage/tick
+            takeDamage(Math.max(3, playerDamageCache / 4), vfxManager, currentTime);
             lastBurnTick = currentTime;
         }
         if (plasmaEndTime > currentTime && currentTime - lastPlasmaTick >= 500) {
-            // Plasma DoT: 50% playerDamage/tick
-            takeDamage(Math.max(5, playerDamageCache / 2), vfxManager, currentTime);
+            // Plasma DoT: 33% playerDamage/tick
+            takeDamage(Math.max(5, playerDamageCache / 3), vfxManager, currentTime);
             lastPlasmaTick = currentTime;
         }
         if (poisonEndTime > currentTime && currentTime - lastPoisonTick >= 500) {
-            // Poison DoT: 20% playerDamage/tick
-            takeDamage(Math.max(2, playerDamageCache / 5), vfxManager, currentTime);
+            // Poison DoT: 10% playerDamage/tick
+            takeDamage(Math.max(2, playerDamageCache / 10), vfxManager, currentTime);
             lastPoisonTick = currentTime;
         }
     }
@@ -195,8 +192,15 @@ public abstract class Enemy implements gameproject.Renderable {
     }
 
     public void takeDamage(int damage, boolean isCrit, VFXManager vfxManager, long currentTime) {
+        // 1. Áp dụng hệ số Chí mạng (Cơ bản x1.5 + Thưởng từ Bloodlust Evolution)
+        if (isCrit) {
+            float multiplier = 1.5f + (gameproject.meta.PlayerData.evoBloodlust * 0.10f);
+            damage = (int) (damage * multiplier);
+        }
+
+        // 2. Áp dụng hệ số Độc (x1.3) - Có thể cộng dồn với Chí mạng
         if (poisonEndTime > currentTime) {
-            damage = (int) (damage * 1.3f); // Damage stack: Crit * Poison Multi
+            damage = (int) (damage * 1.3f); // Stack: (Base * 1.5) * 1.3
         }
 
         if (isCrit) {
@@ -207,7 +211,14 @@ public abstract class Enemy implements gameproject.Renderable {
             }
             takeDamageBase(damage, null, currentTime, critColor);
         } else {
-            takeDamageBase(damage, vfxManager, currentTime, poisonEndTime > currentTime ? Color.GREEN : Color.WHITE);
+            // Priority: Burn (Orange) > Poison (Green) > Normal (White)
+            Color textColor = Color.WHITE;
+            if (burnEndTime > currentTime)
+                textColor = new Color(255, 100, 0); // Orange-Red for Fire
+            else if (poisonEndTime > currentTime)
+                textColor = Color.GREEN;
+
+            takeDamageBase(damage, vfxManager, currentTime, textColor);
         }
     }
 
@@ -215,7 +226,24 @@ public abstract class Enemy implements gameproject.Renderable {
         takeDamage(damage, false, vfxManager, currentTime);
     }
 
+    public void takeDamageDirect(int damage, boolean isCrit, VFXManager vfxManager, long currentTime) {
+        takeDamage(damage, isCrit, vfxManager, currentTime);
+    }
+
     public void takeDamageBase(int damage, VFXManager vfxManager, long currentTime, Color textColor) {
+        // Xử lý Affix SHIELDED: Chặn 3 hit đầu tiên
+        if (isElite && eliteAffix == EliteAffix.SHIELDED && shieldHits > 0) {
+            shieldHits--;
+            if (vfxManager != null) {
+                vfxManager.addDamageText(this.x + 15, this.y, 0, currentTime, new Color(100, 200, 255));
+                // Thêm hiệu ứng vỡ khiên nếu hit cuối
+                if (shieldHits <= 0) {
+                    vfxManager.spawnDeathParticles(x + size / 2, y + size / 2, currentTime, new Color(0, 150, 255));
+                }
+            }
+            return;
+        }
+
         this.hp -= damage;
         hitFlashEndTime = currentTime + 80; // Hit flash 80ms
         if (vfxManager != null) {
@@ -235,7 +263,7 @@ public abstract class Enemy implements gameproject.Renderable {
 
     /** Kiểm tra quái đã cạn kiệt HP (dùng bởi passive skills, va chạm, etc.) */
     public boolean isDead() {
-        return this.hp <= 0;
+        return this.hp <= 0 || isDying;
     }
 
     /** Kiểm tra đã xong animation fade và có thể xóa khỏi danh sách */
@@ -255,7 +283,15 @@ public abstract class Enemy implements gameproject.Renderable {
         return y;
     }
 
+    public int getSize() {
+        return size;
+    }
+
     public int getMaxHp() {
+        return maxHp;
+    }
+
+    public int getExpValue() {
         return maxHp;
     }
 
@@ -282,15 +318,37 @@ public abstract class Enemy implements gameproject.Renderable {
             int drawW = size + 20;
             int drawH = size + 20;
 
-            // 1. Hiệu ứng Blood Moon Aura (Vòng tròn đỏ dưới chân)
-            if (gameproject.state.PlayingState.activeEvent == gameproject.state.PlayingState.EventType.BLOOD_MOON &&
-                gameproject.state.PlayingState.eventPhase == gameproject.state.PlayingState.EventPhase.ACTIVE && !isBoss) {
-                g2d.setColor(new Color(255, 0, 0, (int)(70 * alpha)));
-                g2d.fillOval((int)x - 5, (int)y + size - 10, size + 10, 15);
+            // 1. Hiệu ứng Elite Glow (Hào quang màu rực rỡ theo Affix)
+            if (isElite) {
+                float pulse = (float) (Math.sin(now / 150.0) * 0.2f + 0.8f);
+                Color auraColor = new Color(255, 215, 0); // Mặc định vàng
+                if (eliteAffix != null) {
+                    switch (eliteAffix) {
+                        case EXPLOSIVE: auraColor = new Color(255, 100, 0); break;
+                        case SHIELDED:  auraColor = new Color(0, 180, 255); break;
+                        case SPLITTING: auraColor = new Color(255, 0, 255); break;
+                        case VAMPIRIC:  auraColor = new Color(0, 255, 100); break;
+                        case BERSERKER: auraColor = new Color(255, 50, 50); break;
+                    }
+                }
+                g2d.setColor(new Color(auraColor.getRed(), auraColor.getGreen(), auraColor.getBlue(), (int) (100 * pulse * alpha)));
+                g2d.fillOval(drawX - 10, drawY - 10, drawW + 20, drawH + 20);
             }
 
-            g2d.drawImage(img, drawX, drawY, drawW, drawH, null);
+            // 2. Hiệu ứng Blood Moon Aura (Vòng tròn đỏ dưới chân)
+            if (gameproject.state.PlayingState.activeEvent == gameproject.state.PlayingState.EventType.BLOOD_MOON &&
+                    gameproject.state.PlayingState.eventPhase == gameproject.state.PlayingState.EventPhase.ACTIVE
+                    && !isBoss) {
+                g2d.setColor(new Color(255, 0, 0, (int) (70 * alpha)));
+                g2d.fillOval((int) x - 5, (int) y + size - 10, size + 10, 15);
+            }
 
+            if (movingRight) {
+                g2d.drawImage(img, drawX, drawY, drawW, drawH, null);
+            } else {
+                // Flip image: draw with negative width and adjusted X
+                g2d.drawImage(img, drawX + drawW, drawY, -drawW, drawH, null);
+            }
 
             // Hit flash: vẽ lớp trắng bán trong suốt lên trên sprite
             if (now < hitFlashEndTime) {
@@ -327,5 +385,11 @@ public abstract class Enemy implements gameproject.Renderable {
 
     public int getHp() {
         return hp;
+    }
+
+    public String getName() {
+        if (isBoss) return "ELITE BOSS";
+        if (isElite) return "ELITE ENEMY";
+        return "ENEMY";
     }
 }

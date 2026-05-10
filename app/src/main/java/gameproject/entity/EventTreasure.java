@@ -39,7 +39,7 @@ public class EventTreasure {
 
         long currentTime = GamePanel.getTickTime();
         double chance = Math.random();
-        if (chance < 0.5) { // 50/50 Tỉ lệ
+        if (chance < 0.75) { // Tỉ lệ phần thưởng 75%, Mimic 25%
             // Reward: Rơi vật phẩm hoặc nâng cấp trực tiếp
             SoundManager.play("pickup");
             
@@ -67,6 +67,7 @@ public class EventTreasure {
                 panel.entityManager.enemies.add(new Mimic(x, y, panel.entityManager.waveCount));
             }
             panel.vfxManager.showWaveBanner("IT'S A MIMIC!", java.awt.Color.RED, currentTime);
+            gameproject.meta.AchievementManager.getInstance().onSecretTriggered("mimic_trap");
         }
     }
 }

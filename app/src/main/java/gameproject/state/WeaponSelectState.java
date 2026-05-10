@@ -25,22 +25,22 @@ public class WeaponSelectState implements State {
         if (options == null) {
             options = new Weapon[3];
             options[0] = new Shotgun();
-            options[1] = new AssaultRifle();
-            options[2] = new SMG();
+            options[1] = new SniperRifle();
+            options[2] = new AssaultRifle();
 
-            // Shotgun + Explosive Corpse lv1 + Might lv3 → Hellfire Boomstick
+            // Shotgun + Explosive Bullets lv1 + Might lv3 → Hellfire Boomstick
             if (game.currentWeapon instanceof Shotgun &&
-                    game.player.getBreakthroughLevel(Upgrade.EXPLOSIVE_CORPSE) > 0 &&
+                    game.player.getBreakthroughLevel(Upgrade.EXPLOSIVE_BULLETS) > 0 &&
                     game.player.getUpgradeLevel(Upgrade.DAMAGE) >= 3) {
                 options[0] = new HellfireBoomstick();
             }
-            // AssaultRifle + Optical Scope lv3 → Railgun
-            if (game.currentWeapon instanceof AssaultRifle &&
+            // SniperRifle + Optical Scope lv3 → Railgun
+            if (game.currentWeapon instanceof SniperRifle &&
                     game.player.getUpgradeLevel(Upgrade.OPTICAL_SCOPE) >= 3) {
                 options[1] = new Railgun();
             }
-            // SMG + Chain Lightning lv1 + Fire Rate lv3 → Lightning Gun
-            if (game.currentWeapon instanceof SMG &&
+            // AssaultRifle + Chain Lightning lv1 + Fire Rate lv3 → Lightning Gun
+            if (game.currentWeapon instanceof AssaultRifle &&
                     game.player.getBreakthroughLevel(Upgrade.CHAIN_LIGHTNING) > 0 &&
                     game.player.getUpgradeLevel(Upgrade.FIRE_RATE) >= 3) {
                 options[2] = new LightningGun();
@@ -48,17 +48,31 @@ public class WeaponSelectState implements State {
         }
 
         if (game.input.mouseClicked) {
-            int boxWidth = 280, boxHeight = 300, spacing = 50;
-            int startX = (game.screenWidth - (3 * boxWidth + 2 * spacing)) / 2;
-            int by = (game.screenHeight - boxHeight) / 2;
+            // ĐỒNG BỘ KÍCH THƯỚC VÀ VỊ TRÍ VỚI UI MỚI
+            int cardW = 320, cardH = 460, spacing = 60;
+            int totalW = (3 * cardW + 2 * spacing);
+            int startX = (game.screenWidth - totalW) / 2;
+            int startY = (game.screenHeight - cardH) / 2 + 40;
+
             int mx = game.input.mouseX;
             int my = game.input.mouseY;
 
             for (int i = 0; i < 3; i++) {
-                int bx = startX + i * (boxWidth + spacing);
-                if (mx >= bx && mx <= bx + boxWidth && my >= by && my <= by + boxHeight) {
+                int bx = startX + i * (cardW + spacing);
+                // Kiểm tra click trong phạm vi thẻ (cardH có thể offset nhẹ nhưng ở đây ta dùng
+                // tọa độ tĩnh)
+                if (mx >= bx && mx <= bx + cardW && my >= startY && my <= startY + cardH) {
+                    Weapon selected = options[i];
                     // Kế thừa tỉ lệ nâng cấp từ vũ khí hiện tại
-                    game.currentWeapon = transferStats(game.currentWeapon, options[i]);
+                    game.currentWeapon = transferStats(game.currentWeapon, selected);
+
+                    if (selected instanceof HellfireBoomstick ||
+                            selected instanceof Railgun ||
+                            selected instanceof LightningGun) {
+                        gameproject.meta.AchievementManager.getInstance().onEvolvedWeapon(selected.getClass().getSimpleName());
+                    }
+
+                    gameproject.SoundManager.play("shoot"); // Âm thanh xác nhận
                     game.changeState(new PlayingState());
                     break;
                 }
@@ -70,7 +84,7 @@ public class WeaponSelectState implements State {
     @Override
     public void render(GamePanel game, Graphics g) {
         if (options != null) {
-            WeaponSelectUI.draw(g, game.screenWidth, game.screenHeight, options);
+            WeaponSelectUI.draw(g, game.screenWidth, game.screenHeight, options, game.input.mouseX, game.input.mouseY);
         }
     }
 }

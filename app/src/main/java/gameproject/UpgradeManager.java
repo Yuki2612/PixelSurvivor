@@ -9,7 +9,7 @@ import gameproject.skill.PassiveSkill;
 import gameproject.skill.OrbitingOrbsSkill;
 import gameproject.skill.TrailOfFireSkill;
 import gameproject.skill.FrostAuraSkill;
-import gameproject.skill.ExplosiveCorpseSkill;
+import gameproject.skill.ExplosiveBulletsSkill;
 import gameproject.skill.VampirismSkill;
 import gameproject.skill.PoisonCloudSkill;
 import gameproject.skill.EnergyShieldSkill;
@@ -20,11 +20,10 @@ import gameproject.weapon.Weapon;
 public class UpgradeManager {
     public int playerLevel = 1;
     public int currentExp = 0;
-    public int expToNextLevel = 100;
+    public int expToNextLevel = 150; // Tăng EXP khởi điểm để phù hợp với lượng quái mới
 
     // Những chỉ số gốc của Player được quản lý tập trung ở đây
     public int playerDamage = 10;
-    public float bulletSpeedMulti = 1.0f;
 
     // Lưu 3 thẻ nâng cấp hiện tại trên màn hình
     public Upgrade[] currentUpgradeOptions;
@@ -34,7 +33,6 @@ public class UpgradeManager {
         currentExp = 0;
         expToNextLevel = 100;
         playerDamage = 10 + gameproject.meta.PlayerData.statDamageLevel;
-        bulletSpeedMulti = 1.0f;
 
         if (startingLevel > 1) {
             // Tính toán tổng EXP cần thiết để đạt đến level mong muốn
@@ -42,7 +40,8 @@ public class UpgradeManager {
             for (int i = 1; i < startingLevel; i++) {
                 totalExpNeeded += (int) (100 * Math.pow(1.25, i - 1));
             }
-            // Gán EXP vào. Khi game bắt đầu, processLevelUp sẽ tự động kích hoạt giao diện chọn thẻ liên tục.
+            // Gán EXP vào. Khi game bắt đầu, processLevelUp sẽ tự động kích hoạt giao diện
+            // chọn thẻ liên tục.
             currentExp = totalExpNeeded;
         }
         currentUpgradeOptions = null;
@@ -61,7 +60,9 @@ public class UpgradeManager {
         if (currentExp >= expToNextLevel) {
             currentExp -= expToNextLevel;
             playerLevel++;
-            expToNextLevel = (int) (100 * Math.pow(1.25, playerLevel - 1));
+            gameproject.meta.AchievementManager.getInstance().updateLevel(playerLevel);
+            // Công thức EXP mới: Base 150, hệ số 1.30 (Tăng độ khó khi level cao)
+            expToNextLevel = (int) (150 * Math.pow(1.30, playerLevel - 1));
 
             generateOptions(player);
             return true; // Trả về true báo hiệu game nên dừng để bốc thẻ
@@ -100,7 +101,8 @@ public class UpgradeManager {
                 allValidOptions.add(u);
         }
 
-        // 2. Nếu chưa đủ 5 loại đột phá, thêm các loại chưa sở hữu vào danh sách lựa chọn
+        // 2. Nếu chưa đủ 5 loại đột phá, thêm các loại chưa sở hữu vào danh sách lựa
+        // chọn
         if (owned.size() < 5) {
             for (Upgrade u : Upgrade.values()) {
                 if (u.isBreakthrough && !owned.contains(u) && gameproject.meta.PlayerData.unlockedSkills.contains(u)) {
@@ -109,7 +111,8 @@ public class UpgradeManager {
             }
         }
 
-        // 3. Xáo trộn toàn bộ để đảm bảo tính ngẫu nhiên (không ưu tiên cái đã có lên slot 1)
+        // 3. Xáo trộn toàn bộ để đảm bảo tính ngẫu nhiên (không ưu tiên cái đã có lên
+        // slot 1)
         Collections.shuffle(allValidOptions);
 
         List<Upgrade> options = new ArrayList<>();
@@ -134,7 +137,7 @@ public class UpgradeManager {
                 if ((upgrade == Upgrade.ORBITING_ORBS && s instanceof OrbitingOrbsSkill) ||
                         (upgrade == Upgrade.TRAIL_OF_FIRE && s instanceof TrailOfFireSkill) ||
                         (upgrade == Upgrade.FROST_AURA && s instanceof FrostAuraSkill) ||
-                        (upgrade == Upgrade.EXPLOSIVE_CORPSE && s instanceof ExplosiveCorpseSkill) ||
+                        (upgrade == Upgrade.EXPLOSIVE_BULLETS && s instanceof ExplosiveBulletsSkill) ||
                         (upgrade == Upgrade.POISON_CLOUD && s instanceof PoisonCloudSkill)) {
                     hasSkill = true;
                     break;
@@ -147,8 +150,8 @@ public class UpgradeManager {
                     activeSkills.add(new TrailOfFireSkill());
                 else if (upgrade == Upgrade.FROST_AURA)
                     activeSkills.add(new FrostAuraSkill());
-                else if (upgrade == Upgrade.EXPLOSIVE_CORPSE)
-                    activeSkills.add(new ExplosiveCorpseSkill());
+                else if (upgrade == Upgrade.EXPLOSIVE_BULLETS)
+                    activeSkills.add(new ExplosiveBulletsSkill());
                 else if (upgrade == Upgrade.POISON_CLOUD)
                     activeSkills.add(new PoisonCloudSkill());
                 else if (upgrade == Upgrade.ENERGY_SHIELD)
@@ -165,7 +168,7 @@ public class UpgradeManager {
                 case FIRE_RATE -> currentWeapon.cooldown = (long) (currentWeapon.cooldown * 0.91);
                 case MOVE_SPEED -> player.upgradeSpeed(0.3f);
                 case DASH_COOLDOWN -> player.upgradeDashCooldown(150);
-                case BULLET_SPEED -> bulletSpeedMulti += 0.12f;
+
                 case VAMPIRISM -> {
                     boolean hasVamp = false;
                     for (PassiveSkill s : activeSkills) {

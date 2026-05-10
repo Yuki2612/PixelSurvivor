@@ -5,18 +5,18 @@ import java.util.ArrayList;
 
 public class LightningGun extends Weapon {
     public LightningGun() {
-        super("Lightning Gun", 0.45f, 100, true, 400f);
+        super("Lightning Gun", 1.1f, 300, true, 350f);
     }
 
     @Override
     public void shoot(float startX, float startY, float targetX, float targetY,
-            float bulletSpeedMulti, int playerDamage, int bounces,
+            int playerDamage, int bounces,
             ArrayList<Projectile> projectiles, long currentTime) {
 
         lastShootTime = currentTime;
         SoundManager.play("shoot");
 
-        Projectile p = new Projectile(startX, startY, targetX, targetY, bulletSpeedMulti, range);
+        Projectile p = new Projectile(startX, startY, targetX, targetY, 1.0f, range);
         p.damage = (int) (playerDamage * damageMultiplier);
         p.bouncesLeft = bounces + 1; // Nảy thêm 1 mục tiêu
         p.isShocking = true; // Sát thương hệ sét

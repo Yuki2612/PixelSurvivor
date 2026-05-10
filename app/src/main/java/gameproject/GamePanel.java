@@ -19,6 +19,7 @@ import gameproject.state.SettingsState;
 import gameproject.state.GuideState;
 import gameproject.state.SkillsState;
 import gameproject.state.StatsState;
+import gameproject.state.VictoryState;
 import gameproject.meta.PlayerData;
 import gameproject.meta.CharacterClass;
 import gameproject.environment.MapManager;
@@ -62,14 +63,15 @@ public class GamePanel extends JPanel implements Runnable {
 
     private State currentState;
     public int currentFPS = 0;
-    
+
     // --- Hệ thống Thời gian Game (Managed Game Clock) ---
     private static long totalPausedTime = 0;
     private static long pauseStartTime = 0;
     private static boolean isPaused = false;
 
     public static long getTickTime() {
-        if (isPaused) return pauseStartTime - totalPausedTime;
+        if (isPaused)
+            return pauseStartTime - totalPausedTime;
         return System.currentTimeMillis() - totalPausedTime;
     }
 
@@ -85,6 +87,12 @@ public class GamePanel extends JPanel implements Runnable {
             totalPausedTime += (System.currentTimeMillis() - pauseStartTime);
             isPaused = false;
         }
+    }
+
+    public static void resetTime() {
+        isPaused = false;
+        totalPausedTime = 0;
+        pauseStartTime = 0;
     }
 
     public GamePanel() {
@@ -116,7 +124,8 @@ public class GamePanel extends JPanel implements Runnable {
         SoundManager.load("laser", "app/res/laser.wav");
         SoundManager.load("shield", "app/res/shield.wav");
         SoundManager.load("pickup", "app/res/pickup.wav");
-        
+        SoundManager.load("achievement", "app/res/achievement.wav");
+
         // Load player hurt sounds (giả định có 3 file)
         for (int i = 1; i <= 3; i++) {
             SoundManager.load("playerhurt" + i, "app/res/player" + i + "hurt.wav");
@@ -140,13 +149,16 @@ public class GamePanel extends JPanel implements Runnable {
                 break;
         }
 
+        ImageManager.load("skill_explosive", "app/res/skill_explosive.png");
+        ImageManager.load("skill_explosive_bullets", "app/res/skill_explosive.png");
         ImageManager.load("player", "app/res/player.png");
         for (int i = 1; i <= 5; i++) {
             ImageManager.load("player" + i, "app/res/player" + i + ".png");
             ImageManager.load("enemy" + i, "app/res/enemy" + i + ".png");
 
-            // Load Animations (Cập nhật thông số chính xác từ thuộc tính ảnh)
             String prefix = "player" + i;
+            // NẠP ANIMATION LINH HOẠT: Ưu tiên đọc số frame từ tên file (ví dụ: _f15.png)
+            // Nếu không có, sẽ tự động dùng số frame mặc định bên dưới.
             ImageManager.loadAnimation(prefix + "_idle_side", "app/res/" + prefix + "_idle_side.png", 16);
             ImageManager.loadAnimation(prefix + "_run_side", "app/res/" + prefix + "_run_side.png", 10);
             ImageManager.loadAnimation(prefix + "_idle_down", "app/res/" + prefix + "_idle_down.png", 10);
@@ -154,9 +166,25 @@ public class GamePanel extends JPanel implements Runnable {
             ImageManager.loadAnimation(prefix + "_idle_up", "app/res/" + prefix + "_idle_up.png", 10);
             ImageManager.loadAnimation(prefix + "_run_up", "app/res/" + prefix + "_run_up.png", 12);
         }
-        ImageManager.load("boss1", "app/res/boss1.png");
-        ImageManager.load("boss2", "app/res/boss2.png");
-        ImageManager.load("boss3", "app/res/boss3.png");
+        for (int i = 1; i <= 3; i++) {
+            String bKey = "boss" + i;
+            ImageManager.load(bKey, "app/res/" + bKey + ".png");
+            // Tự động thử nạp các bộ animation nếu tồn tại (Smart Search sẽ lo phần _f8)
+            ImageManager.loadAnimation(bKey + "_idle", "app/res/" + bKey + "_idle.png");
+            ImageManager.loadAnimation(bKey + "_attack", "app/res/" + bKey + "_attack.png");
+            ImageManager.loadAnimation(bKey + "_dash", "app/res/" + bKey + "_dash.png");
+            ImageManager.loadAnimation(bKey + "_death", "app/res/" + bKey + "_death.png");
+        }
+        // Boss 4 - Dark Fairy (có 2 phase, animation riêng cho mỗi phase)
+        ImageManager.loadAnimation("boss4_move", "app/res/boss4_move.png");
+        ImageManager.loadAnimation("boss4_cast", "app/res/boss4_cast.png");
+        ImageManager.loadAnimation("boss4_death", "app/res/boss4_death.png");
+        ImageManager.loadAnimation("boss4_move2", "app/res/boss4_move2.png");
+        ImageManager.loadAnimation("boss4_cast2", "app/res/boss4_cast2.png");
+        ImageManager.loadAnimation("boss4_teleport", "app/res/boss4_teleport.png");
+        ImageManager.loadAnimation("boss4_transform", "app/res/boss4_transform.png");
+
+
         ImageManager.load("chest1", "app/res/chest1.png");
         ImageManager.load("chest2", "app/res/chest2.png");
         ImageManager.load("gold", "app/res/gold.png");
@@ -169,6 +197,25 @@ public class GamePanel extends JPanel implements Runnable {
         ImageManager.load("floor", "app/res/floor.png");
         ImageManager.load("treasure", "app/res/treasure.png");
         ImageManager.load("mimic", "app/res/mimic.png");
+        ImageManager.load("boss_hud", "app/res/boss_hud.png");
+        ImageManager.load("enemy_wizard", "app/res/enemy_wizard.png");
+        ImageManager.load("enemy_assassin", "app/res/enemy_assassin.png");
+        ImageManager.load("enemy_shooter", "app/res/enemy_shooter.png");
+        
+        ImageManager.load("shotgun", "app/res/shotgun.png");
+        ImageManager.load("sniper_rifle", "app/res/sniper_rifle.png");
+        ImageManager.load("assault_rifle", "app/res/assault_rifle.png");
+
+        // Load Skill Icons
+        for (gameproject.skill.Upgrade u : gameproject.skill.Upgrade.values()) {
+            String fileName = u.name().toLowerCase();
+            if (u == gameproject.skill.Upgrade.SHIELD)
+                fileName = "hp";
+            else if (u == gameproject.skill.Upgrade.OPTICAL_SCOPE)
+                fileName = "range";
+
+            ImageManager.load("skill_" + u.name().toLowerCase(), "app/res/skill_" + fileName + ".png");
+        }
 
         PlayerData.load();
 
@@ -185,12 +232,12 @@ public class GamePanel extends JPanel implements Runnable {
         // Quản lý dừng/tiếp tục thời gian game dựa trên State
         if (state instanceof gameproject.state.PlayingState) {
             resumeGame();
-        } else if (state instanceof gameproject.state.LevelUpState || 
-                   state instanceof gameproject.state.WeaponSelectState ||
-                   state instanceof gameproject.state.PauseState) {
+        } else if (state instanceof gameproject.state.LevelUpState ||
+                state instanceof gameproject.state.WeaponSelectState ||
+                state instanceof gameproject.state.PauseState) {
             pauseGame();
         }
-        
+
         this.currentState = state;
         updateMusic();
     }
@@ -219,16 +266,20 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     public void startNewGame() {
+        resetTime();
         gameproject.state.PlayingState.resetEvents();
         CharacterClass charClass = PlayerData.selectedClass;
-        
-        // Tạo mới bản đồ cho mỗi lượt chơi để tăng tính ngẫu nhiên (Roguelike experience)
+
+        // Tạo mới bản đồ cho mỗi lượt chơi để tăng tính ngẫu nhiên (Roguelike
+        // experience)
         synchronized (buildings) {
             buildings.clear();
             mapManager = new MapManager(WORLD_WIDTH, WORLD_HEIGHT, buildings);
         }
-        
+
         player = new Player(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, charClass);
+        cameraX = player.getX() - screenWidth / 2f;
+        cameraY = player.getY() - screenHeight / 2f;
         score = 0;
         activeSkills.clear();
         currentWeapon = new Pistol();
@@ -255,8 +306,15 @@ public class GamePanel extends JPanel implements Runnable {
         changeState(new gameproject.state.PlayingState());
     }
 
+    public void triggerVictory(boolean noHit, boolean noDash) {
+        PlayerData.save();
+        gameproject.meta.AchievementManager.getInstance().onVictory(surviveTimeSeconds, noHit, noDash);
+        changeState(new VictoryState(score, entityManager.waveCount, surviveTimeSeconds, currentWeapon.name, player, activeSkills));
+    }
+
     public void triggerGameOver() {
         PlayerData.save();
+        gameproject.meta.AchievementManager.getInstance().addDeath();
         changeState(new GameOverState(score, entityManager.waveCount, currentWeapon.name, player, activeSkills));
     }
 
@@ -312,6 +370,9 @@ public class GamePanel extends JPanel implements Runnable {
                     frameCount = 0;
                     lastFPSCheck = System.currentTimeMillis();
                 }
+
+                // Cập nhật Thành tựu toàn cục (cho Popup thông báo)
+                gameproject.meta.AchievementManager.getInstance().update(System.currentTimeMillis());
             }
         }
     }
@@ -322,5 +383,8 @@ public class GamePanel extends JPanel implements Runnable {
         if (currentState != null) {
             currentState.render(this, g);
         }
+        
+        // Vẽ thông báo Thành tựu ở lớp trên cùng của mọi màn hình
+        gameproject.meta.AchievementManager.getInstance().drawToast(g, screenWidth, screenHeight);
     }
 }

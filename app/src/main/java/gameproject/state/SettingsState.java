@@ -17,9 +17,11 @@ public class SettingsState implements State {
             if (game.input.typedKeySequence.endsWith("010206")) {
                 isAdminMode = true;
                 showAdminInput = false;
+                gameproject.meta.AchievementManager.getInstance().onSecretTriggered("admin_access");
             }
         } else if (game.input.typedKeySequence.endsWith("010206")) {
             isAdminMode = true;
+            gameproject.meta.AchievementManager.getInstance().onSecretTriggered("admin_access");
         }
 
         if (game.input.escPressed) {
@@ -77,7 +79,7 @@ public class SettingsState implements State {
                         gameproject.meta.PlayerData.soulStones += 100;
                     }
                     if (mx >= cardX + (cardW+spacing)*2 && mx <= cardX + (cardW+spacing)*2 + cardW && my >= cardY && my <= cardY + cardH) {
-                        gameproject.meta.PlayerData.debugStartWave = (gameproject.meta.PlayerData.debugStartWave % 50) + 1;
+                        gameproject.meta.PlayerData.debugStartWave = (gameproject.meta.PlayerData.debugStartWave % gameproject.entity.EntityManager.FINAL_WAVE) + 1;
                     }
                     if (mx >= cardX + (cardW+spacing)*3 && mx <= cardX + (cardW+spacing)*3 + cardW && my >= cardY && my <= cardY + cardH) {
                         gameproject.meta.PlayerData.debugStartLevel = (gameproject.meta.PlayerData.debugStartLevel % 100) + 1;
@@ -140,18 +142,13 @@ public class SettingsState implements State {
     }
 
     private void performReset() {
-        gameproject.meta.PlayerData.gold = 0;
-        gameproject.meta.PlayerData.soulStones = 0;
-        gameproject.meta.PlayerData.statHealthLevel = 0;
-        gameproject.meta.PlayerData.statDamageLevel = 0;
-        gameproject.meta.PlayerData.statSpeedLevel = 0;
-        gameproject.meta.PlayerData.statDashLevel = 0;
-        gameproject.meta.PlayerData.statCritLevel = 0;
-        gameproject.meta.PlayerData.statCooldownLevel = 0;
-        gameproject.meta.PlayerData.skillSoulLevels.clear();
-        gameproject.meta.PlayerData.debugStartWave = 1;
-        gameproject.meta.PlayerData.debugStartLevel = 1;
-        gameproject.meta.PlayerData.save();
+        gameproject.meta.PlayerData.reset();
+        
+        // Reset Achievements
+        gameproject.meta.AchievementManager.getInstance().reset();
+
+        // Rebake Stats UI to reset lines
+        gameproject.ui.StatsUI.requestRebake();
     }
 
     @Override

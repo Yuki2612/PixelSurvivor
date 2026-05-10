@@ -5,7 +5,7 @@ import java.util.ArrayList;
 
 public class Shotgun extends Weapon {
     public Shotgun() {
-        super("Shotgun", 0.8f, 750, false, 150f);
+        super("Shotgun", 0.85f, 650, false, 250f);
     }
 
     @Override
@@ -14,7 +14,7 @@ public class Shotgun extends Weapon {
     }
 
     @Override
-    public void shoot(float startX, float startY, float targetX, float targetY, float bulletSpeedMulti,
+    public void shoot(float startX, float startY, float targetX, float targetY,
             int playerDamage, int bounces, ArrayList<Projectile> projectiles, long currentTime) {
         float dx = targetX - startX;
         float dy = targetY - startY;
@@ -26,7 +26,7 @@ public class Shotgun extends Weapon {
         for (double angle : angles) {
             float tX = startX + (float) Math.cos(angle) * 100;
             float tY = startY + (float) Math.sin(angle) * 100;
-            Projectile p = new Projectile(startX, startY, tX, tY, bulletSpeedMulti, range);
+            Projectile p = new Projectile(startX, startY, tX, tY, 1.0f, range);
             p.damage = finalDamage;
             p.bouncesLeft = bounces;
             projectiles.add(p);

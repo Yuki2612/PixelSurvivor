@@ -20,27 +20,27 @@ public class NormalEnemy extends Enemy {
         switch (tier) {
             case 1 -> {
                 this.maxHp = 20;
-                this.speed = 1.2f;
+                this.speed = 0.9f;
             }
             case 2 -> {
                 this.maxHp = 30;
-                this.speed = 1.5f;
+                this.speed = 1.1f;
             }
             case 3 -> {
                 this.maxHp = 50;
-                this.speed = 1.8f;
+                this.speed = 1.4f;
             }
             case 4 -> {
                 this.maxHp = 70;
-                this.speed = 2.1f;
+                this.speed = 1.7f;
             }
             default -> {
                 this.maxHp = 100;
-                this.speed = 2.4f;
+                this.speed = 2.0f;
                 this.tier = 5;
             }
         }
-        this.maxHp = (int) (this.maxHp * (1.0f + (surviveTimeSeconds / 60.0f) * 0.1f));
+        this.maxHp = (int) (this.maxHp * (1.0f + (surviveTimeSeconds / 30.0f) * 0.15f));
         this.hp = this.maxHp;
     }
 
@@ -51,10 +51,6 @@ public class NormalEnemy extends Enemy {
         // Gọi bộ não AI tập trung để xử lý di chuyển và va chạm (Sliding Collision)
         EnemyController.moveEnemy(this, panel, speedMultiplier);
 
-        // AI Phá vật cản (Giữ nguyên tính năng đặc trưng của bạn)
-        float fdx = panel.mapManager.getFlowDirX((int) x + size / 2, (int) y + size / 2);
-        float fdy = panel.mapManager.getFlowDirY((int) x + size / 2, (int) y + size / 2);
-        handleObstacleBreaking(fdx * speed, fdy * speed, panel);
     }
 
     @Override

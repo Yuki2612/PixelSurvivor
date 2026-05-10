@@ -24,33 +24,84 @@ public class EnemyController {
             return;
 
         float currentSpeed = enemy.speed * speedMultiplier;
+        
+        // --- Xử lý Affix Elite ---
+        if (enemy.isElite) {
+            // 1. BERSERKER: Tăng tốc cực mạnh khi thấp máu (<30%)
+            if (enemy.eliteAffix == Enemy.EliteAffix.BERSERKER && enemy.hp < enemy.maxHp * 0.3f) {
+                currentSpeed *= 2.5f;
+            }
+            
+            // 2. VAMPIRIC: Hồi máu khi chạm người chơi
+            if (enemy.eliteAffix == Enemy.EliteAffix.VAMPIRIC) {
+                float dxV = (panel.player.getX() + gameproject.Player.SIZE/2) - (enemy.x + enemy.size/2);
+                float dyV = (panel.player.getY() + gameproject.Player.SIZE/2) - (enemy.y + enemy.size/2);
+                float distSqV = dxV*dxV + dyV*dyV;
+                float touchDist = (enemy.size + gameproject.Player.SIZE) * 0.45f;
+                if (distSqV < touchDist * touchDist) {
+                    long now = GamePanel.getTickTime();
+                    if (now - enemy.lastVampireHealTime > 1000) {
+                        int healAmount = (int)(enemy.maxHp * 0.15f);
+                        enemy.hp = Math.min(enemy.maxHp, enemy.hp + healAmount);
+                        panel.vfxManager.addDamageText(enemy.x + 15, enemy.y - 10, healAmount, now, java.awt.Color.GREEN);
+                        enemy.lastVampireHealTime = now;
+                    }
+                }
+            }
+        }
 
         // 1. LẤY HƯỚNG TỪ FLOW FIELD
         Rectangle bounds = enemy.getPhysicsHitbox();
         int centerX = bounds.x + bounds.width / 2;
         int centerY = bounds.y + bounds.height / 2;
 
+        // 1. CƠ CHẾ THOÁT HIỂM KHẨN CẤP (EMERGENCY UNSTUCK)
+        // Nếu quái lỡ bị kẹt sâu trong tường, đẩy chúng ra hướng thoáng nhất
+        if (panel.mapManager.isSolid(centerX, centerY)) {
+            // Thử đẩy ra 4 hướng chính
+            int pushDist = 16;
+            if (!panel.mapManager.isSolid(centerX - pushDist, centerY))
+                enemy.x -= 8;
+            else if (!panel.mapManager.isSolid(centerX + pushDist, centerY))
+                enemy.x += 8;
+            else if (!panel.mapManager.isSolid(centerX, centerY - pushDist))
+                enemy.y -= 8;
+            else if (!panel.mapManager.isSolid(centerX, centerY + pushDist))
+                enemy.y += 8;
+            else {
+                // Nếu kẹt cứng mọi hướng, đẩy về phía người chơi (thường là vùng an toàn)
+                float toPX = panel.player.getX() - enemy.x;
+                float toPY = panel.player.getY() - enemy.y;
+                float dist = (float) Math.sqrt(toPX * toPX + toPY * toPY);
+                if (dist > 0) {
+                    enemy.x += (toPX / dist) * 10;
+                    enemy.y += (toPY / dist) * 10;
+                }
+            }
+        }
+
+        // 2. LẤY HƯỚNG TỪ FLOW FIELD
         float dirX = panel.mapManager.getFlowDirX(centerX, centerY);
         float dirY = panel.mapManager.getFlowDirY(centerX, centerY);
 
-        // Cận chiến: Bỏ qua FlowField nếu sát Player để lao vào
+        // Tính khoảng cách để phục vụ logic giãn cách bầy đàn
         float dxP = panel.player.getX() - enemy.x;
         float dyP = panel.player.getY() - enemy.y;
         float distSqP = dxP * dxP + dyP * dyP;
 
-        if (distSqP < (TILE_SIZE * 0.8f) * (TILE_SIZE * 0.8f)) {
-            float d = (float) Math.sqrt(distSqP);
-            if (d > 0) {
-                dirX = dxP / d;
-                dirY = dyP / d;
-            }
-        }
-
-        // 2. LỰC ĐẨY BẦY ĐÀN (Tách nhau ra)
+        // 3. LỰC ĐẨY BẦY ĐÀN (Tách nhau ra)
         float[] sep = calculateSeparation(enemy, panel.entityManager.enemies);
 
         // TỐI ƯU: Giảm lực đẩy khi áp sát người chơi để quái có thể "chạm" vào player dễ hơn
-        float sepWeight = (distSqP < 40000) ? 0.25f : 0.6f; 
+        float sepWeight = 0.6f;
+        if (distSqP < 10000) sepWeight = 0.05f; // Rất nhỏ khi sát player
+        else if (distSqP < 40000) sepWeight = 0.2f; 
+
+        // Cập nhật hướng quay mặt (Luôn hướng về phía người chơi giống Boss)
+        float enemyCenterX = enemy.x + enemy.size / 2f;
+        float playerCenterX = panel.player.getX() + gameproject.Player.SIZE / 2f;
+        if (playerCenterX > enemyCenterX + 5) enemy.movingRight = true;
+        else if (playerCenterX < enemyCenterX - 5) enemy.movingRight = false;
 
         // 3. VẬT LÝ QUÁN TÍNH
         float targetVelX = (dirX * currentSpeed) + sep[0] * sepWeight;
@@ -88,23 +139,29 @@ public class EnemyController {
             enemy.kbX = 0;
         if (Math.abs(enemy.kbY) < 0.1f)
             enemy.kbY = 0;
+
+        // 6. GIỚI HẠN BIÊN THẾ GIỚI (World Clamping)
+        enemy.x = Math.max(0, Math.min(enemy.x, GamePanel.WORLD_WIDTH - enemy.size));
+        enemy.y = Math.max(0, Math.min(enemy.y, GamePanel.WORLD_HEIGHT - enemy.size));
     }
 
     /**
      * Thuật toán phát hiện và đẩy trượt vật lý.
-     * Biến quái vật thành một hình tròn ở sát chân để tương tác mượt với môi trường.
+     * Biến quái vật thành một hình tròn ở sát chân để tương tác mượt với môi
+     * trường.
      */
-    private static boolean resolveHybridCollision(Enemy enemy, MapManager map) {
+    public static boolean resolveHybridCollision(Enemy enemy, MapManager map) {
         boolean collided = false;
-        float radius = enemy.size * 0.3f;
+        float radius = enemy.size * 0.35f; // Tăng nhẹ để chân quái cảm giác "đầm" hơn
         float cx = enemy.x + enemy.size / 2.0f;
-        float cy = enemy.y + enemy.size - radius;
+        float cy = enemy.y + enemy.size * 0.85f; // Đặt tâm va chạm ở chân quái
 
         List<Obstacle> nearObs = map.getObstaclesInRadius(cx, cy, radius * 2 + TILE_SIZE);
 
         for (Obstacle obs : nearObs) {
             Hitbox hb = obs.getHitbox();
-            if (hb == null) continue;
+            if (hb == null)
+                continue;
 
             if (hb instanceof CircleHitbox) {
                 CircleHitbox cb = (CircleHitbox) hb;
@@ -116,12 +173,23 @@ public class EnemyController {
                 if (distSq < minDist * minDist) {
                     collided = true;
                     float dist = (float) Math.sqrt(distSq);
-                    if (dist == 0) { dx = 1; dist = 1; }
+                    // Nếu tâm trùng nhau, tạo một hướng đẩy ngẫu nhiên nhẹ để không bị kẹt cứng
+                    if (dist < 0.1f) {
+                        dx = (float) Math.random() - 0.5f;
+                        dy = (float) Math.random() - 0.5f;
+                        dist = (float) Math.sqrt(dx * dx + dy * dy);
+                    }
+
                     float overlap = minDist - dist;
-                    enemy.x += (dx / dist) * overlap;
-                    enemy.y += (dy / dist) * overlap;
+                    float nx = dx / dist;
+                    float ny = dy / dist;
+
+                    enemy.x += nx * overlap;
+                    enemy.y += ny * overlap;
+
+                    // Cập nhật lại tâm ngay lập tức cho các lần kiểm tra vật thể tiếp theo
                     cx = enemy.x + enemy.size / 2.0f;
-                    cy = enemy.y + enemy.size - radius;
+                    cy = enemy.y + enemy.size * 0.85f;
                 }
             } else if (hb instanceof AABBHitbox) {
                 AABBHitbox ab = (AABBHitbox) hb;
@@ -144,13 +212,17 @@ public class EnemyController {
                     float dt = cy - ab.y;
                     float db = (ab.y + ab.height) - cy;
                     float minDist = Math.min(Math.min(dl, dr), Math.min(dt, db));
-                    if (minDist == dl) enemy.x -= (dl + radius);
-                    else if (minDist == dr) enemy.x += (dr + radius);
-                    else if (minDist == dt) enemy.y -= (dt + radius);
-                    else enemy.y += (db + radius);
+                    if (minDist == dl)
+                        enemy.x -= (dl + radius);
+                    else if (minDist == dr)
+                        enemy.x += (dr + radius);
+                    else if (minDist == dt)
+                        enemy.y -= (dt + radius);
+                    else
+                        enemy.y += (db + radius);
                 }
                 cx = enemy.x + enemy.size / 2.0f;
-                cy = enemy.y + enemy.size - radius;
+                cy = enemy.y + enemy.size * 0.85f;
             }
         }
         return collided;
@@ -162,21 +234,25 @@ public class EnemyController {
         float maxCheckDist = me.size * 1.5f;
         float maxCheckDistSq = maxCheckDist * maxCheckDist;
 
-        // TỐI ƯU O(N): Chỉ kiểm tra các thực thể trong vùng lân cận để tránh lag khi quái đông
+        // TỐI ƯU O(N): Chỉ kiểm tra các thực thể trong vùng lân cận để tránh lag khi
+        // quái đông
         for (Enemy other : enemies) {
             if (other == me || other.isDying)
                 continue;
-            
+
             // Box check nhanh trước khi tính bình phương
             float dx = me.x - other.x;
-            if (Math.abs(dx) > maxCheckDist) continue;
+            if (Math.abs(dx) > maxCheckDist)
+                continue;
             float dy = me.y - other.y;
-            if (Math.abs(dy) > maxCheckDist) continue;
+            if (Math.abs(dy) > maxCheckDist)
+                continue;
 
             float distSq = dx * dx + dy * dy;
             if (distSq > 0 && distSq < maxCheckDistSq) {
                 float dist = (float) Math.sqrt(distSq);
-                float safeDistance = (me.size + other.size) * 0.45f; // Cho phép quái chồng lấn nhẹ để trông đông đúc hơn
+                float safeDistance = (me.size + other.size) * 0.45f; // Cho phép quái chồng lấn nhẹ để trông đông đúc
+                                                                     // hơn
                 if (dist < safeDistance) {
                     float force = (safeDistance - dist) / safeDistance;
                     sepX += (dx / dist) * force * 1.5f;
@@ -184,12 +260,13 @@ public class EnemyController {
                     count++;
                 }
             }
-            if (count > 10) break; // Chỉ tính toán tối đa 10 quái gần nhất để giữ 60 FPS
+            if (count > 10)
+                break; // Chỉ tính toán tối đa 10 quái gần nhất để giữ 60 FPS
         }
 
         // Giới hạn lực đẩy tối đa để tránh bị "bắn" ra quá mạnh
         float maxSep = 4.0f;
-        float sepLen = (float)Math.sqrt(sepX*sepX + sepY*sepY);
+        float sepLen = (float) Math.sqrt(sepX * sepX + sepY * sepY);
         if (sepLen > maxSep) {
             sepX = (sepX / sepLen) * maxSep;
             sepY = (sepY / sepLen) * maxSep;

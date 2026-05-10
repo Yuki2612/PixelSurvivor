@@ -18,11 +18,24 @@ public class EnergyShieldSkill implements PassiveSkill {
         if (level > 0) {
             float soulMulti = 1.0f
                     + (gameproject.meta.PlayerData.skillSoulLevels.getOrDefault(Upgrade.ENERGY_SHIELD, 0) * 0.05f);
-            long cooldown = (long) ((15000 - (level * 1000)) / soulMulti);
-            if (currentTime - lastActivateTime > cooldown) {
-                player.addInvulnerability(3000); // 3 giây bất tử
-                lastActivateTime = currentTime;
-                gameproject.SoundManager.play("shield");
+
+            // Base cooldown 30s. Mỗi level giảm 2s.
+            long cooldown = (long) ((30000 - (level * 2000)) / soulMulti);
+
+            if (player.hasShield) {
+                // Kiểm tra thời gian tồn tại của khiên (3 giây = 3000ms)
+                if (currentTime - lastActivateTime > 3000) {
+                    player.hasShield = false;
+                }
+            } else {
+                // Nếu không có khiên, kiểm tra thời gian hồi chiêu
+                if (currentTime - lastActivateTime > cooldown) {
+                    player.hasShield = true;
+                    lastActivateTime = currentTime;
+                    // Hiệu ứng hạt khi khiên bật lên
+                    vfxManager.spawnDeathParticles(player.getX() + 12, player.getY() + 12, currentTime, Color.CYAN);
+                    gameproject.SoundManager.play("powerup"); // Thêm một chút âm thanh báo hiệu khiên bật
+                }
             }
         }
     }
@@ -30,11 +43,11 @@ public class EnergyShieldSkill implements PassiveSkill {
     @Override
     public void draw(Graphics g, Player player) {
         int level = player.getBreakthroughLevel(Upgrade.ENERGY_SHIELD);
-        if (level > 0 && player.isInvulnerable()) {
-            g.setColor(new Color(0, 255, 255, 80));
-            g.fillOval((int) player.getX() - 20, (int) player.getY() - 20, 65, 65);
-            g.setColor(Color.CYAN);
-            g.drawOval((int) player.getX() - 20, (int) player.getY() - 20, 65, 65);
+        if (level > 0 && (player.hasShield || player.isInvulnerable())) {
+            g.setColor(new Color(0, 255, 255, 60));
+            g.fillOval((int) player.getX() - 15, (int) player.getY() - 15, 55, 55);
+            g.setColor(new Color(0, 255, 255, 150));
+            g.drawOval((int) player.getX() - 15, (int) player.getY() - 15, 55, 55);
         }
     }
 

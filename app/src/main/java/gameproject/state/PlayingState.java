@@ -3,27 +3,26 @@ package gameproject.state;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Color;
-import java.awt.Rectangle;
 import gameproject.GamePanel;
-import gameproject.ImageManager;
 import gameproject.SoundManager;
-import gameproject.ui.HUD;
 import gameproject.ui.CharacterStatsUI;
 import gameproject.skill.Upgrade;
 import gameproject.skill.PassiveSkill;
-import gameproject.skill.FrostAuraSkill;
-import gameproject.skill.PoisonCloudSkill;
-import gameproject.skill.OrbitingOrbsSkill;
 import gameproject.environment.Building;
 
 public class PlayingState implements State {
-    public enum EventType { NONE, ACID_RAIN, DARKNESS, MIMIC_MANIA, BLOOD_MOON }
-    public enum EventPhase { WARNING, ACTIVE }
+    public enum EventType {
+        NONE, ACID_RAIN, DARKNESS, MIMIC_MANIA, BLOOD_MOON
+    }
+
+    public enum EventPhase {
+        WARNING, ACTIVE, ENDING
+    }
 
     public static EventType activeEvent = EventType.NONE;
     public static EventPhase eventPhase = EventPhase.WARNING;
-    
-    private static long eventEndTime = 0;
+
+    public static long eventEndTime = 0;
     private static long nextPhaseTime = 0;
     private static int lastCheckedWave = 0;
     private static long lastDamageTick = 0;
@@ -35,10 +34,30 @@ public class PlayingState implements State {
         nextPhaseTime = 0;
         lastCheckedWave = 0;
         lastDamageTick = 0;
+        phantomClonesHit = 0;
     }
-    
+
     private boolean showStats = false;
     private boolean iKeyPrev = false;
+    private boolean lostHealthThisRun = false;
+    private int lastHearts = -1;
+    private long clutchSurvivalStart = -1;
+    private static final long CLUTCH_SURVIVAL_NEEDED = 300000; // 5 mins in ms
+    private boolean clutchAchieved = false;
+
+    // --- NEW ACHIEVEMENT TRACKING ---
+    private boolean usedDashThisRun = false;
+    public static int phantomClonesHit = 0; // Static to access from PhantomWarlock
+    private float lastPlayerX = -1, lastPlayerY = -1;
+    private int goldAtStart = -1;
+    private java.util.Set<Integer> visitedBuildings = new java.util.HashSet<>();
+    private long buildingStayStart = -1;
+    private long totalBuildingTime = 0;
+    private int damageTakenThisWave = 0;
+    private int bulletsShotThisWave = 0;
+    private int noHitWaveStreak = 0;
+    private int noShootWaveStreak = 0;
+    private int currentWaveCheck = 0;
 
     @Override
     public void update(GamePanel game) {
@@ -67,11 +86,75 @@ public class PlayingState implements State {
         }
         iKeyPrev = game.input.iPressed;
 
-        if (showStats) return;
+        if (showStats)
+            return;
 
         long currentTime = gameproject.GamePanel.getTickTime();
         int surviveTimeSeconds = (int) ((currentTime - game.startTime) / 1000);
         game.surviveTimeSeconds = surviveTimeSeconds;
+
+        // Init starting stats
+        if (goldAtStart == -1)
+            goldAtStart = gameproject.meta.PlayerData.gold;
+        if (lastPlayerX == -1) {
+            lastPlayerX = game.player.getX();
+            lastPlayerY = game.player.getY();
+        }
+
+        // Track Distance
+        float dx = game.player.getX() - lastPlayerX;
+        float dy = game.player.getY() - lastPlayerY;
+        float dist = (float) Math.sqrt(dx * dx + dy * dy);
+        if (dist > 0 && dist < 100) { // Filter teleport/respawn
+            gameproject.meta.AchievementManager.getInstance().updateDistance(dist);
+            lastPlayerX = game.player.getX();
+            lastPlayerY = game.player.getY();
+        }
+
+        // Track Wealth (In Run)
+        int currentGoldInRun = gameproject.meta.PlayerData.gold - goldAtStart;
+        gameproject.meta.AchievementManager.getInstance().onStatChanged("wealth", currentGoldInRun, "gold");
+
+        // Track Dash
+        if (game.player.isDashing())
+            usedDashThisRun = true;
+
+        // Track Buildings
+        boolean inside = false;
+        synchronized (game.buildings) {
+            for (int i = 0; i < game.buildings.size(); i++) {
+                if (game.buildings.get(i).isPlayerInside()) {
+                    inside = true;
+                    visitedBuildings.add(i);
+                    break;
+                }
+            }
+        }
+        if (inside) {
+            if (buildingStayStart == -1)
+                buildingStayStart = currentTime;
+            else {
+                long duration = currentTime - buildingStayStart;
+                totalBuildingTime += duration;
+                gameproject.meta.AchievementManager.getInstance().onStatChanged("explorer",
+                        (int) (totalBuildingTime / 60000), "homebody");
+                buildingStayStart = currentTime;
+            }
+        } else {
+            buildingStayStart = -1;
+        }
+        if (visitedBuildings.size() >= game.buildings.size() && game.buildings.size() > 0) {
+            gameproject.meta.AchievementManager.getInstance().onStatChanged("explorer", 1, "architect");
+        }
+
+        // Track Combo
+        int combo = game.player.getComboManager().getComboCount();
+        gameproject.meta.AchievementManager.getInstance().onStatChanged("combat", combo, "combo");
+
+        // Track Phantom Clones
+        if (phantomClonesHit >= 10) {
+            gameproject.meta.AchievementManager.getInstance().onStatChanged("secret", 1, "phantom_troll");
+        }
 
         handleEvents(game, currentTime);
 
@@ -104,19 +187,59 @@ public class PlayingState implements State {
 
         // Dash afterimage
         if (game.player.isDashing()) {
-            game.vfxManager.addDashAfterimage(game.player.getX(), game.player.getY(), currentTime);
+            int dSize = gameproject.Player.SIZE + 20;
+            java.awt.image.BufferedImage currentFrame = null;
+            if (game.player.getActiveAnim() != null) {
+                currentFrame = game.player.getActiveAnim().getCurrentFrame();
+            }
+            if (currentFrame != null) {
+                game.vfxManager.addDashAfterimage(
+                        game.player.getX() - 10,
+                        game.player.getY() - 20,
+                        dSize, dSize,
+                        currentTime,
+                        currentFrame,
+                        game.player.isFacingRight());
+            }
         }
 
         game.entityManager.update(game.player, game.vfxManager, game.activeSkills, game.screenWidth, game.screenHeight,
                 currentTime, surviveTimeSeconds, game);
 
         float fireRateBonus = game.player.getComboManager().getFireRateBonus();
+        float frenzyBonus = game.player.getFrenzyFireRateBonus();
         if (game.input.isMouseHolding && game.currentWeapon.isAutomatic
-                && game.currentWeapon.canShoot(currentTime, fireRateBonus)) {
+                && game.currentWeapon.canShoot(currentTime, fireRateBonus, frenzyBonus)) {
             triggerShoot(game, currentTime);
         } else if (game.input.mouseClicked && !game.currentWeapon.isAutomatic
-                && game.currentWeapon.canShoot(currentTime, fireRateBonus)) {
+                && game.currentWeapon.canShoot(currentTime, fireRateBonus, frenzyBonus)) {
             triggerShoot(game, currentTime);
+        }
+
+        // Tích hợp Thành tựu
+        gameproject.meta.AchievementManager.getInstance().updateSurvivalTime(surviveTimeSeconds);
+
+        if (lastHearts == -1)
+            lastHearts = game.player.getHearts();
+        if (game.player.getHearts() < lastHearts) {
+            lostHealthThisRun = true;
+            int damage = lastHearts - game.player.getHearts();
+            if (damage > 0)
+                damageTakenThisWave += damage;
+            clutchSurvivalStart = -1; // Reset clutch timer on damage
+        }
+        lastHearts = game.player.getHearts();
+
+        // Check Clutch Survivor (Survive 5 mins with 1 HP)
+        if (!clutchAchieved && game.player.getHearts() == 1) {
+            if (clutchSurvivalStart == -1) {
+                clutchSurvivalStart = currentTime;
+            } else if (currentTime - clutchSurvivalStart >= CLUTCH_SURVIVAL_NEEDED) {
+                gameproject.meta.AchievementManager.getInstance().onClutchSurvived();
+                clutchAchieved = true;
+            }
+        } else {
+            clutchSurvivalStart = -1;
         }
 
         if (game.upgradeManager.processLevelUp(game.player)) {
@@ -133,66 +256,111 @@ public class PlayingState implements State {
                 b.update(game.player);
             }
         }
+
+        // --- KIỂM TRA WAVE TRANSITION (Thành tựu Genre) ---
+        if (game.entityManager.waveCount > currentWaveCheck) {
+            // Wave transition! Check previous wave stats.
+            if (currentWaveCheck > 0) {
+                if (damageTakenThisWave == 0) {
+                    noHitWaveStreak++;
+                    gameproject.meta.AchievementManager.getInstance().onStatChanged("combat", noHitWaveStreak,
+                            "flawless");
+                } else {
+                    noHitWaveStreak = 0;
+                }
+
+                if (bulletsShotThisWave == 0) {
+                    noShootWaveStreak++;
+                    gameproject.meta.AchievementManager.getInstance().onStatChanged("combat", noShootWaveStreak,
+                            "pacifist");
+                } else {
+                    noShootWaveStreak = 0;
+                }
+            }
+            currentWaveCheck = game.entityManager.waveCount;
+            damageTakenThisWave = 0;
+            bulletsShotThisWave = 0;
+        }
+
+        // --- KIỂM TRA CHIẾN THẮNG ---
+        if (game.entityManager.waveCount >= gameproject.entity.EntityManager.FINAL_WAVE
+                && game.entityManager.enemies.isEmpty()) {
+            game.triggerVictory(!lostHealthThisRun, !usedDashThisRun);
+        }
+
+        // --- KIỂM TRA GAME OVER ---
+        if (game.player.getHearts() <= 0) {
+            game.triggerGameOver();
+        }
     }
 
     private void handleEvents(GamePanel game, long currentTime) {
         int wave = game.entityManager.waveCount;
-        
+
         // Trigger mới mỗi 4 wave (bắt đầu từ wave 4)
         if (wave > 0 && wave % 4 == 0 && wave != lastCheckedWave) {
             lastCheckedWave = wave;
             // Chọn ngẫu nhiên 1 trong các event
             double rnd = Math.random();
-            if (rnd < 0.25) activeEvent = EventType.ACID_RAIN;
-            else if (rnd < 0.50) activeEvent = EventType.DARKNESS;
-            else if (rnd < 0.75) activeEvent = EventType.MIMIC_MANIA;
-            else activeEvent = EventType.BLOOD_MOON;
-            
+            if (rnd < 0.25)
+                activeEvent = EventType.ACID_RAIN;
+            else if (rnd < 0.50)
+                activeEvent = EventType.DARKNESS;
+            else if (rnd < 0.75)
+                activeEvent = EventType.MIMIC_MANIA;
+            else
+                activeEvent = EventType.BLOOD_MOON;
+
             eventPhase = EventPhase.WARNING;
             nextPhaseTime = currentTime + 10000;
-            eventEndTime = currentTime + 70000;
+            eventEndTime = currentTime + 50000; // Tổng 50s (10s báo + 40s chạy)
         }
 
         if (activeEvent != EventType.NONE) {
             // Timeout logic: Khi hết thời gian, các treasure chưa mở sẽ hóa mimic
+            // Timeout logic
             if (currentTime > eventEndTime) {
-                if (activeEvent == EventType.MIMIC_MANIA) {
-                    java.util.List<gameproject.entity.EventTreasure> chestsToConvert;
-                    synchronized (game.entityManager.eventChests) {
-                        chestsToConvert = new java.util.ArrayList<>(game.entityManager.eventChests);
-                        game.entityManager.eventChests.clear();
-                    }
-                    synchronized (game.entityManager.enemies) {
-                        for (gameproject.entity.EventTreasure et : chestsToConvert) {
-                            game.entityManager.enemies.add(new gameproject.entity.Mimic(et.x, et.y, wave));
+                if (eventPhase != EventPhase.ENDING) {
+                    // Chuyển sang phase kết thúc (dần dần sáng)
+                    eventPhase = EventPhase.ENDING;
+                    eventEndTime = currentTime + 3000; // 3 giây để tan biến bóng tối
+
+                    if (activeEvent == EventType.MIMIC_MANIA) {
+                        java.util.List<gameproject.entity.EventTreasure> chestsToConvert;
+                        synchronized (game.entityManager.eventChests) {
+                            chestsToConvert = new java.util.ArrayList<>(game.entityManager.eventChests);
+                            game.entityManager.eventChests.clear();
                         }
+                        synchronized (game.entityManager.enemies) {
+                            for (gameproject.entity.EventTreasure et : chestsToConvert) {
+                                game.entityManager.enemies.add(new gameproject.entity.Mimic(et.x, et.y, wave));
+                            }
+                        }
+                        game.vfxManager.showWaveBanner("THE REMAINING CHESTS AWAKEN!", Color.RED, currentTime);
+                        // Trigger "Trust Issues" achievement
+                        gameproject.meta.AchievementManager.getInstance().onEventMet("mimic_mania");
                     }
-                    game.vfxManager.showWaveBanner("THE REMAINING CHESTS AWAKEN!", Color.RED, currentTime);
+                    return;
+                } else {
+                    activeEvent = EventType.NONE;
+                    return;
                 }
-                activeEvent = EventType.NONE;
-                return;
             }
 
             if (eventPhase == EventPhase.WARNING) {
                 long timeLeft = (nextPhaseTime - currentTime) / 1000;
                 if (timeLeft >= 0) {
                     String msg = "";
-                    if (activeEvent == EventType.ACID_RAIN) msg = "⚠ ACID RAIN IN " + timeLeft + "s! FIND SHELTER!";
-                    else if (activeEvent == EventType.DARKNESS) msg = "⚠ DARKNESS APPROACHING IN " + timeLeft + "s!";
-                    else if (activeEvent == EventType.BLOOD_MOON) msg = "⚠ BLOOD MOON IN " + timeLeft + "s! PREPARE FOR CARNAGE!";
+                    if (activeEvent == EventType.ACID_RAIN)
+                        msg = "⚠ ACID RAIN IN " + timeLeft + "s! FIND SHELTER!";
+                    else if (activeEvent == EventType.DARKNESS)
+                        msg = "⚠ DARKNESS APPROACHING IN " + timeLeft + "s!";
+                    else if (activeEvent == EventType.BLOOD_MOON)
+                        msg = "⚠ BLOOD MOON IN " + timeLeft + "s! PREPARE FOR CARNAGE!";
                     else if (activeEvent == EventType.MIMIC_MANIA) {
                         msg = "⚠ FIND TREASURES IN BUILDINGS! (" + timeLeft + "s)";
-                        // Spawn rương một lần duy nhất khi bắt đầu warning
-                        if (game.entityManager.eventChests.isEmpty()) {
-                            synchronized (game.buildings) {
-                                for (Building b : game.buildings) {
-                                    Rectangle r = b.getBounds();
-                                    game.entityManager.eventChests.add(new gameproject.entity.EventTreasure(r.x + r.width/2 - 20, r.y + r.height/2 - 20));
-                                }
-                            }
-                        }
                     }
-                    
+
                     // Chỉ show banner mỗi giây
                     if (currentTime % 1000 < 50) {
                         game.vfxManager.showWaveBanner(msg, Color.YELLOW, currentTime);
@@ -201,11 +369,30 @@ public class PlayingState implements State {
                 if (currentTime > nextPhaseTime) {
                     eventPhase = EventPhase.ACTIVE;
                     String startMsg = "NIGHTFALL!";
-                    if (activeEvent == EventType.ACID_RAIN) startMsg = "ACID RAIN ACTIVE!";
-                    else if (activeEvent == EventType.MIMIC_MANIA) startMsg = "FIND THEM BEFORE THEY AWAKEN!";
-                    else if (activeEvent == EventType.BLOOD_MOON) startMsg = "THE BLOOD MOON RISES!";
-                    
+                    if (activeEvent == EventType.ACID_RAIN)
+                        startMsg = "ACID RAIN ACTIVE!";
+                    else if (activeEvent == EventType.MIMIC_MANIA) {
+                        startMsg = "FIND THEM BEFORE THEY AWAKEN!";
+                        // Spawn rương khi bắt đầu phase ACTIVE (hết 10s đếm ngược)
+                        synchronized (game.buildings) {
+                            for (Building b : game.buildings) {
+                                java.awt.Rectangle r = b.getBounds();
+                                game.entityManager.eventChests.add(new gameproject.entity.EventTreasure(
+                                        r.x + r.width / 2 - 20, r.y + r.height / 2 - 20));
+                            }
+                        }
+                    } else if (activeEvent == EventType.BLOOD_MOON)
+                        startMsg = "THE BLOOD MOON RISES!";
+
                     game.vfxManager.showWaveBanner(startMsg, Color.RED, currentTime);
+
+                    // Trigger Achievements for normal events when 10s warning ends
+                    if (activeEvent == EventType.ACID_RAIN)
+                        gameproject.meta.AchievementManager.getInstance().onEventMet("acid_rain");
+                    else if (activeEvent == EventType.DARKNESS)
+                        gameproject.meta.AchievementManager.getInstance().onEventMet("darkness");
+                    else if (activeEvent == EventType.BLOOD_MOON)
+                        gameproject.meta.AchievementManager.getInstance().onEventMet("blood_moon");
                 }
             } else if (eventPhase == EventPhase.ACTIVE) {
                 if (activeEvent == EventType.ACID_RAIN) {
@@ -225,6 +412,8 @@ public class PlayingState implements State {
                             if (game.player.takeHit()) {
                                 game.triggerGameOver();
                             } else if (game.player.getHearts() < oldHearts) {
+                                lostHealthThisRun = true;
+                                clutchSurvivalStart = -1; // Reset clutch timer on damage
                                 game.vfxManager.triggerPlayerDamageFlash(currentTime);
                             }
                         }
@@ -237,13 +426,9 @@ public class PlayingState implements State {
 
     private void triggerShoot(GamePanel game, long currentTime) {
         int critLevel = game.player.getUpgradeLevel(Upgrade.CRIT_CHANCE);
-        int finalDamage = game.upgradeManager.playerDamage;
         float baseCrit = gameproject.meta.PlayerData.statCritLevel * 0.01f;
         float totalCrit = baseCrit + (critLevel * 0.07f);
         boolean isCrit = totalCrit > 0 && Math.random() < totalCrit;
-        if (isCrit) {
-            finalDamage = (int) (finalDamage * 1.5);
-        }
 
         int bouncesAndPierces = game.player.getUpgradeLevel(Upgrade.CHAIN_LIGHTNING);
 
@@ -252,15 +437,19 @@ public class PlayingState implements State {
         float worldMouseY = game.input.mouseY + game.cameraY;
 
         // Ghi lại số lượng đạn trước khi bắn để xác định đạn mới
-        int prevSize = game.entityManager.projectiles.size();
-        game.currentWeapon.shoot(game.player.getX(), game.player.getY(), worldMouseX, worldMouseY,
-                game.upgradeManager.bulletSpeedMulti, finalDamage, bouncesAndPierces, game.entityManager.projectiles,
-                currentTime);
+        synchronized (game.entityManager.projectiles) {
+            int prevSize = game.entityManager.projectiles.size();
+            game.currentWeapon.shoot(game.player.getX(), game.player.getY(), worldMouseX, worldMouseY,
+                    game.upgradeManager.playerDamage, bouncesAndPierces, game.entityManager.projectiles,
+                    currentTime);
 
-        // Gán flag isCrit cho tất cả đạn vừa được thêm
-        if (isCrit) {
-            for (int i = prevSize; i < game.entityManager.projectiles.size(); i++) {
-                game.entityManager.projectiles.get(i).isCrit = true;
+            bulletsShotThisWave += (game.entityManager.projectiles.size() - prevSize);
+
+            // Gán flag isCrit cho tất cả đạn vừa được thêm
+            if (isCrit) {
+                for (int i = prevSize; i < game.entityManager.projectiles.size(); i++) {
+                    game.entityManager.projectiles.get(i).isCrit = true;
+                }
             }
         }
     }
@@ -290,14 +479,15 @@ public class PlayingState implements State {
             g.setColor(java.awt.Color.DARK_GRAY);
             g.fillRect(0, 0, game.screenWidth, game.screenHeight);
         }
-        
+
         // CHỐT SỔ TỌA ĐỘ CAMERA DUY NHẤT 1 LẦN CHO CHU KỲ RENDER
         game.camIntX = (int) Math.round(game.cameraX);
         game.camIntY = (int) Math.round(game.cameraY);
 
         game.vfxManager.applyScreenShake(g2d);
 
-        // QUY CHUẨN PIXEL-PERFECT: Dịch chuyển toàn bộ thế giới theo tọa độ camera đã chốt sổ
+        // QUY CHUẨN PIXEL-PERFECT: Dịch chuyển toàn bộ thế giới theo tọa độ camera đã
+        // chốt sổ
         g2d.translate(-game.camIntX, -game.camIntY);
 
         // 1. Vẽ Sàn nhà (Nằm dưới mọi vật thể nhưng trên cỏ)
@@ -364,7 +554,7 @@ public class PlayingState implements State {
         game.vfxManager.resetScreenShake(g2d);
         // Overlay toàn màn hình (Bóng tối, bão acid, flash đỏ, wave banner)
         long now = gameproject.GamePanel.getTickTime();
-        game.vfxManager.drawOverlays(g, game.screenWidth, game.screenHeight, now, game);
+        game.vfxManager.drawOverlay(g, game, game.screenWidth, game.screenHeight, now);
 
         // --- HUD --- (Vẽ HUD sau cùng để nổi lên trên các hiệu ứng môi trường)
         gameproject.ui.HUD.draw(g, game, game.player, game.entityManager.enemies);

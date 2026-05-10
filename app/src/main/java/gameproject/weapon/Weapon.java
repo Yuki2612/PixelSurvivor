@@ -27,16 +27,16 @@ public abstract class Weapon {
         return 1;
     }
 
-    public long getActualCooldown(float fireRateBonus) {
-        float totalBonus = gameproject.meta.PlayerData.statCooldownLevel * 0.02f + fireRateBonus;
+    public long getActualCooldown(float fireRateBonus, float frenzyBonus) {
+        float totalBonus = gameproject.meta.PlayerData.statCooldownLevel * 0.01f + fireRateBonus + frenzyBonus;
         return (long) (cooldown * (1.0f - Math.min(0.9f, totalBonus)));
     }
 
-    public boolean canShoot(long currentTime, float fireRateBonus) {
-        return currentTime - lastShootTime >= getActualCooldown(fireRateBonus);
+    public boolean canShoot(long currentTime, float fireRateBonus, float frenzyBonus) {
+        return currentTime - lastShootTime >= getActualCooldown(fireRateBonus, frenzyBonus);
     }
 
     public abstract void shoot(float startX, float startY, float targetX, float targetY,
-            float bulletSpeedMulti, int playerDamage, int bounces,
+            int playerDamage, int bounces,
             ArrayList<Projectile> projectiles, long currentTime);
 }

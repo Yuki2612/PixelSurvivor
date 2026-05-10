@@ -7,16 +7,19 @@ import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.awt.event.KeyEvent;
 import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
 import gameproject.skill.Upgrade;
 import gameproject.meta.CharacterClass;
 import gameproject.meta.PlayerData;
+import gameproject.environment.MapManager;
 
 public class Player implements Renderable {
     private float x, y;
     public static final int SIZE = 25;
+    private CharacterClass charClass;
 
     @Override
     public void render(Graphics2D g) {
@@ -35,7 +38,17 @@ public class Player implements Renderable {
     private final int MAX_HEARTS = 15;
     private long invulnerableUntil = 0;
 
-    private Map<Upgrade, Integer> upgradeLevels = new HashMap<>();
+    // Evolution Buffs
+    private long adrenalineEndTime = 0;
+    private boolean shouldTriggerPhantomExplosion = false;
+
+    // Frenzy Evolution
+    private long frenzyEndTime = 0;
+    private long frenzyLastTriggerTime = 0;
+    private final long FRENZY_DURATION = 2000;
+    private final long FRENZY_COOLDOWN = 4000;
+
+    private Map<Upgrade, Integer> upgradeLevels = new ConcurrentHashMap<>();
 
     private boolean up, down, left, right;
     private float lastDirX = 1, lastDirY = 0;
@@ -60,14 +73,19 @@ public class Player implements Renderable {
     // Combo System integration
     private ComboManager comboManager;
 
+    // Slow system
+    private float slowMultiplier = 1.0f;
+    private long slowEndTime = 0;
+
     public Player(float startX, float startY, CharacterClass charClass) {
         this.x = startX;
         this.y = startY;
         this.dashCooldown = (long) (2000 * (1.0f - PlayerData.statDashLevel * 0.02f));
         this.lastDashTime = -dashCooldown;
         this.hearts = charClass.baseHp + (PlayerData.statHealthLevel / 10);
-        this.speed = (5.0f * charClass.speedMulti) * (1.0f + PlayerData.statSpeedLevel * 0.02f);
+        this.speed = (4.0f * charClass.speedMulti) * (1.0f + PlayerData.statSpeedLevel * 0.02f);
         this.comboManager = new ComboManager();
+        this.charClass = charClass;
 
         initAnimations(charClass);
     }
@@ -123,39 +141,84 @@ public class Player implements Renderable {
             } else {
                 float nextX = x + dashDirX * DASH_SPEED;
                 float nextY = y + dashDirY * DASH_SPEED;
-                if (!game.mapManager.isColliding(nextX, nextY, SIZE, SIZE)) {
+
+                // Sử dụng hitbox chân (Footprint) để va chạm mượt hơn
+                int footW = 16;
+                int footH = 10;
+                float fx = nextX + (SIZE - footW) / 2f;
+                float fy = nextY + SIZE - footH;
+
+                if (!game.mapManager.isColliding(fx, fy, footW, footH)) {
                     x = nextX;
                     y = nextY;
                 }
                 x = Math.max(0, Math.min(x, GamePanel.WORLD_WIDTH - SIZE));
                 y = Math.max(0, Math.min(y, GamePanel.WORLD_HEIGHT - SIZE));
                 isMoving = true;
+
+                // HANDLE PHANTOM DASH EXPLOSION (Moved to update where 'game' is available)
+                if (shouldTriggerPhantomExplosion) {
+                    shouldTriggerPhantomExplosion = false;
+                    float radius = 100 + (PlayerData.evoPhantomDash * 30);
+                    int dmg = (int) (game.upgradeManager.playerDamage * (0.8f + PlayerData.evoPhantomDash * 0.2f));
+                    game.vfxManager.addExplosion(x, y, radius, dashStartTime);
+                    game.vfxManager.triggerScreenShake(8);
+
+                    synchronized (game.entityManager.enemies) {
+                        for (gameproject.entity.Enemy en : new java.util.ArrayList<>(game.entityManager.enemies)) {
+                            float edist = (float) Math.sqrt(Math.pow(en.getX() - x, 2) + Math.pow(en.getY() - y, 2));
+                            if (edist < radius) {
+                                en.takeDamageDirect(dmg, false, game.vfxManager, dashStartTime);
+                            }
+                        }
+                    }
+                }
             }
         } else {
             float currentDirX = 0, currentDirY = 0;
-            float currentSpeed = speed * (1.0f + comboManager.getMoveSpeedBonus());
 
-            if (up && y > 0) {
+            // Tính toán tốc độ hiện tại (Speed * Combo Bonus * Slow Multiplier * Adrenaline
+            // Bonus)
+            float effectiveSlow = 1.0f;
+            if (gameproject.GamePanel.getTickTime() < slowEndTime) {
+                effectiveSlow = slowMultiplier;
+            }
+            float adrelBonus = 0f;
+            if (gameproject.GamePanel.getTickTime() < adrenalineEndTime) {
+                adrelBonus = (PlayerData.evoBerserker * 0.07f); // +7% per level
+            }
+            float currentSpeed = speed * (1.0f + comboManager.getMoveSpeedBonus() + adrelBonus) * effectiveSlow;
+
+            int footW = 16;
+            int footH = 10;
+
+            if (up && y > MapManager.TILE_SIZE) {
                 float nextY = y - currentSpeed;
-                if (!game.mapManager.isColliding(x, nextY, SIZE, SIZE)) {
+                float fx = x + (SIZE - footW) / 2f;
+                float fy = nextY + SIZE - footH;
+                if (!game.mapManager.isColliding(fx, fy, footW, footH)) {
                     y = nextY;
                     currentDirY = -1;
                     isMoving = true;
                     nextDir = "up";
                 }
             }
-            if (down && y < GamePanel.WORLD_HEIGHT - SIZE) {
+            if (down && y < GamePanel.WORLD_HEIGHT - SIZE - MapManager.TILE_SIZE) {
                 float nextY = y + currentSpeed;
-                if (!game.mapManager.isColliding(x, nextY, SIZE, SIZE)) {
+                float fx = x + (SIZE - footW) / 2f;
+                float fy = nextY + SIZE - footH;
+                if (!game.mapManager.isColliding(fx, fy, footW, footH)) {
                     y = nextY;
                     currentDirY = 1;
                     isMoving = true;
                     nextDir = "down";
                 }
             }
-            if (left && x > 0) {
+            if (left && x > MapManager.TILE_SIZE) {
                 float nextX = x - currentSpeed;
-                if (!game.mapManager.isColliding(nextX, y, SIZE, SIZE)) {
+                float fx = nextX + (SIZE - footW) / 2f;
+                float fy = y + SIZE - footH;
+                if (!game.mapManager.isColliding(fx, fy, footW, footH)) {
                     x = nextX;
                     currentDirX = -1;
                     isMoving = true;
@@ -163,9 +226,11 @@ public class Player implements Renderable {
                     facingRight = false;
                 }
             }
-            if (right && x < GamePanel.WORLD_WIDTH - SIZE) {
+            if (right && x < GamePanel.WORLD_WIDTH - SIZE - MapManager.TILE_SIZE) {
                 float nextX = x + currentSpeed;
-                if (!game.mapManager.isColliding(nextX, y, SIZE, SIZE)) {
+                float fx = nextX + (SIZE - footW) / 2f;
+                float fy = y + SIZE - footH;
+                if (!game.mapManager.isColliding(fx, fy, footW, footH)) {
                     x = nextX;
                     currentDirX = 1;
                     isMoving = true;
@@ -238,6 +303,11 @@ public class Player implements Renderable {
                         dashDirX = lastDirX / length;
                         dashDirY = lastDirY / length;
                     }
+
+                    // Trigger Phantom Dash flag
+                    if (PlayerData.evoPhantomDash > 0) {
+                        shouldTriggerPhantomExplosion = true;
+                    }
                 }
             }
         }
@@ -281,17 +351,46 @@ public class Player implements Renderable {
         return speed;
     }
 
+    public boolean hasShield = false;
+
     public boolean takeHit() {
         if (isInvulnerable())
             return false;
+
+        if (hasShield) {
+            hasShield = false;
+            addInvulnerability(1000); // 1s grace period
+            gameproject.SoundManager.play("shield");
+            return false;
+        }
+
         hearts--;
-        
+
+        // ADRENALINE EVOLUTION: Speed boost on damage
+        if (PlayerData.evoBerserker > 0) {
+            adrenalineEndTime = gameproject.GamePanel.getTickTime() + 3000; // 3 seconds
+        }
+
         // Phát âm thanh bị thương ngẫu nhiên (1-3)
-        int randHurt = 1 + (int)(Math.random() * 3);
+        int randHurt = 1 + (int) (Math.random() * 3);
         SoundManager.play("playerhurt" + randHurt);
 
         invulnerableUntil = gameproject.GamePanel.getTickTime() + 1000;
         return hearts <= 0;
+    }
+
+    public boolean takeDamage(int amount) {
+        // Boss hoặc môi trường gây sát thương trực tiếp
+        if (isInvulnerable())
+            return false;
+
+        // Hiện tại mỗi lần dính chiêu Boss trừ 1 tim (theo yêu cầu mới)
+        return takeHit();
+    }
+
+    public void applySlow(float multiplier, long duration) {
+        this.slowMultiplier = multiplier;
+        this.slowEndTime = gameproject.GamePanel.getTickTime() + duration;
     }
 
     public void levelUpUpgrade(Upgrade u) {
@@ -314,9 +413,11 @@ public class Player implements Renderable {
 
     public List<Upgrade> getOwnedBreakthroughs() {
         List<Upgrade> list = new ArrayList<>();
-        for (Upgrade u : upgradeLevels.keySet()) {
-            if (u.isBreakthrough)
-                list.add(u);
+        synchronized (upgradeLevels) {
+            for (Upgrade u : upgradeLevels.keySet()) {
+                if (u.isBreakthrough)
+                    list.add(u);
+            }
         }
         return list;
     }
@@ -332,6 +433,23 @@ public class Player implements Renderable {
         invulnerableUntil += duration;
     }
 
+    public void triggerFrenzy() {
+        if (PlayerData.evoFrenzy <= 0)
+            return;
+        long now = gameproject.GamePanel.getTickTime();
+        if (now - frenzyLastTriggerTime >= FRENZY_COOLDOWN) {
+            frenzyEndTime = now + FRENZY_DURATION;
+            frenzyLastTriggerTime = now;
+        }
+    }
+
+    public float getFrenzyFireRateBonus() {
+        if (gameproject.GamePanel.getTickTime() < frenzyEndTime) {
+            return PlayerData.evoFrenzy * 0.05f; // +5% per level (Max 25%)
+        }
+        return 0f;
+    }
+
     public Rectangle getBounds() {
         return new Rectangle((int) x, (int) y, SIZE, SIZE);
     }
@@ -344,8 +462,20 @@ public class Player implements Renderable {
         return y;
     }
 
+    public boolean isFacingRight() {
+        return facingRight;
+    }
+
+    public Animation getActiveAnim() {
+        return activeAnim;
+    }
+
     public boolean isDashing() {
         return isDashing;
+    }
+
+    public boolean isMoving() {
+        return currentState == PlayerState.RUN || isDashing;
     }
 
     public long getLastDashTime() {
@@ -358,5 +488,9 @@ public class Player implements Renderable {
 
     public ComboManager getComboManager() {
         return comboManager;
+    }
+
+    public CharacterClass getCharClass() {
+        return charClass;
     }
 }
